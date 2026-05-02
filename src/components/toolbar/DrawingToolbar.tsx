@@ -11,6 +11,10 @@ const ARROW_TOOLS: { id: Tool; label: string; title: string }[] = [
   { id: "destArrow", label: "←", title: "Destination Arrow (wire comes from another sheet)" },
 ];
 
+const ANNOTATION_TOOLS: { id: Tool; label: string; title: string }[] = [
+  { id: "revisionCloud", label: "☁", title: "Revision Cloud — click vertices, double-click to close" },
+];
+
 export function DrawingToolbar() {
   const activeTool = useCanvasStore((s) => s.activeTool);
   const setActiveTool = useCanvasStore((s) => s.setActiveTool);
@@ -29,6 +33,17 @@ export function DrawingToolbar() {
       ))}
       <div className="toolbar-divider" />
       {ARROW_TOOLS.map((tool) => (
+        <button
+          key={tool.id}
+          className={`tool-btn ${activeTool === tool.id ? "tool-btn--active" : ""}`}
+          title={tool.title}
+          onClick={() => setActiveTool(tool.id)}
+        >
+          {tool.label}
+        </button>
+      ))}
+      <div className="toolbar-divider" />
+      {ANNOTATION_TOOLS.map((tool) => (
         <button
           key={tool.id}
           className={`tool-btn ${activeTool === tool.id ? "tool-btn--active" : ""}`}

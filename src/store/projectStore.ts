@@ -7,6 +7,12 @@ import type { Layer } from "../models/layer";
 import { DEFAULT_LAYERS } from "../models/layer";
 import { DEFAULT_SHEET_WIDTH, DEFAULT_SHEET_HEIGHT } from "../models/sheet";
 import { DEFAULT_PROJECT_SETTINGS } from "../models/project";
+import {
+  DEFAULT_TITLE_BLOCK_TEMPLATE,
+  BUILTIN_TEMPLATE_ID,
+  makeDefaultTitleBlockData,
+} from "../models/titleBlock";
+import type { TitleBlockData } from "../models/titleBlock";
 
 function makeDefaultLayers(): Layer[] {
   return DEFAULT_LAYERS.map((l) => ({ ...l, id: uuidv4() }));
@@ -21,7 +27,7 @@ function makeNewSheet(index: number): Sheet {
     height: DEFAULT_SHEET_HEIGHT,
     layers: makeDefaultLayers(),
     elements: [],
-    titleBlockData: null,
+    titleBlockData: makeDefaultTitleBlockData(),
   };
 }
 
@@ -35,8 +41,8 @@ function newProject(): Project {
     settings: { ...DEFAULT_PROJECT_SETTINGS },
     sheets: [makeNewSheet(0)],
     symbolLibraries: [],
-    titleBlockTemplates: [],
-    activeTitleBlockTemplateId: null,
+    titleBlockTemplates: [DEFAULT_TITLE_BLOCK_TEMPLATE],
+    activeTitleBlockTemplateId: BUILTIN_TEMPLATE_ID,
   };
 }
 
@@ -64,6 +70,7 @@ interface ProjectState {
   removeLayer: (sheetId: string, layerId: string) => void;
 
   updateSettings: (updates: Partial<ProjectSettings>) => void;
+  updateTitleBlockData: (sheetId: string, data: TitleBlockData | null) => void;
 
   getSheet: (sheetId: string) => Sheet | undefined;
   getActiveLayer: (sheetId: string) => Layer | undefined;
@@ -198,6 +205,15 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       produce<ProjectState>((state) => {
         Object.assign(state.project.settings, updates);
         state.isDirty = true;
+      })
+    );
+  },
+
+  updateTitleBlockData: (sheetId, data) => {
+    set(
+      produce<ProjectState>((state) => {
+        const sheet = state.project.sheets.find((s) => s.id === sheetId);
+        if (sheet) { sheet.titleBlockData = data; state.isDirty = true; }
       })
     );
   },

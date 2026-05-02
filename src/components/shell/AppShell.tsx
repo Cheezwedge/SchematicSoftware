@@ -9,6 +9,7 @@ import { PropertiesPanel } from "../panels/PropertiesPanel";
 import { DrawingToolbar } from "../toolbar/DrawingToolbar";
 import { DeviceInfoDialog } from "../dialogs/DeviceInfoDialog";
 import { CrossSheetArrowDialog } from "../dialogs/CrossSheetArrowDialog";
+import { TitleBlockEditor } from "../dialogs/TitleBlockEditor";
 import { SchematicCanvas } from "../../canvas/SchematicCanvas";
 import { useCanvasStore } from "../../store/canvasStore";
 import { useProjectStore } from "../../store/projectStore";
@@ -24,6 +25,7 @@ export function AppShell() {
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
   const [arrowPendingPos, setArrowPendingPos] = useState<Point | null>(null);
+  const [showTitleBlockEditor, setShowTitleBlockEditor] = useState(false);
 
   const activeSheetId = useCanvasStore((s) => s.activeSheetId);
   const setActiveSheet = useCanvasStore((s) => s.setActiveSheet);
@@ -187,10 +189,13 @@ export function AppShell() {
 
   return (
     <div className="app-shell">
-      <MenuBar onExportPDF={() => {
-        const sheet = project.sheets.find((s) => s.id === activeSheetId);
-        if (sheet) exportSheetToPDF(sheet);
-      }} />
+      <MenuBar
+        onExportPDF={() => {
+          const sheet = project.sheets.find((s) => s.id === activeSheetId);
+          if (sheet) exportSheetToPDF(sheet);
+        }}
+        onEditTitleBlock={() => setShowTitleBlockEditor(true)}
+      />
       <div className="app-body">
         <aside className="sidebar sidebar--left">
           <DrawingToolbar />
@@ -222,6 +227,10 @@ export function AppShell() {
           onConfirm={handlePlaceSymbol}
           onCancel={() => setPendingPlacement(null)}
         />
+      )}
+
+      {showTitleBlockEditor && (
+        <TitleBlockEditor onClose={() => setShowTitleBlockEditor(false)} />
       )}
 
       {arrowPendingPos && (activeTool === "sourceArrow" || activeTool === "destArrow") && (

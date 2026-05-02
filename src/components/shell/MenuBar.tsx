@@ -5,9 +5,10 @@ import { saveProjectToFile, loadProjectFromFile } from "../../lib/projectIO";
 
 interface Props {
   onExportPDF: () => void;
+  onEditTitleBlock: () => void;
 }
 
-export function MenuBar({ onExportPDF }: Props) {
+export function MenuBar({ onExportPDF, onEditTitleBlock }: Props) {
   const toggleTheme = useThemeStore((s) => s.toggleTheme);
   const theme = useThemeStore((s) => s.theme);
   const { canUndo, canRedo, undo, redo } = useHistoryStore();
@@ -47,6 +48,9 @@ export function MenuBar({ onExportPDF }: Props) {
         </button>
         <button className="menu-btn" title="Export to PDF (Ctrl+P)" onClick={onExportPDF}>
           PDF
+        </button>
+        <button className="menu-btn" title="Edit title block for current sheet" onClick={onEditTitleBlock}>
+          TB
         </button>
         <div className="menu-separator" />
         <button className="menu-btn" title="Toggle theme" onClick={toggleTheme}>

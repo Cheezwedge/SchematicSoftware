@@ -1,5 +1,5 @@
 import { useRef, useCallback, useEffect } from "react";
-import { Stage, Layer, Rect } from "react-konva";
+import { Stage, Layer, Rect, Circle, Line } from "react-konva";
 import type Konva from "konva";
 import { GridLayer } from "./GridLayer";
 import { WireLayer } from "./WireLayer";
@@ -7,6 +7,7 @@ import { SymbolLayer } from "./SymbolLayer";
 import { AnnotationLayer } from "./AnnotationLayer";
 import { useWireTool } from "./hooks/useWireTool";
 import { useSymbolTool } from "./hooks/useSymbolTool";
+import { useRevisionCloudTool } from "./hooks/useRevisionCloudTool";
 import { useCanvasStore } from "../store/canvasStore";
 import { useProjectStore } from "../store/projectStore";
 import { stageRegistry } from "./stageRef";
@@ -37,10 +38,25 @@ export function SchematicCanvas({ sheetId, containerWidth, containerHeight, onAr
   const removeElement = useProjectStore((s) => s.removeElement);
   const updateElement = useProjectStore((s) => s.updateElement);
 
-  const { isDrawing: isDrawingWire, previewPoints, handleMouseDown: wireMouseDown, handleMouseMove: wireMoveMove, handleDoubleClick, cancel: cancelWire } =
-    useWireTool(sheetId);
+  const {
+    isDrawing: isDrawingWire,
+    previewPoints,
+    handleMouseDown: wireMouseDown,
+    handleMouseMove: wireMoveMove,
+    handleDoubleClick: wireDoubleClick,
+    cancel: cancelWire,
+  } = useWireTool(sheetId);
 
   const { handleMouseMove: symbolMouseMove, handleClick: symbolClick } = useSymbolTool();
+
+  const {
+    cloudPoints,
+    cursorPos: cloudCursor,
+    handleMouseMove: cloudMouseMove,
+    handleClick: cloudClick,
+    handleDoubleClick: cloudDoubleClick,
+    cancel: cancelCloud,
+  } = useRevisionCloudTool(sheetId);
 
   const sheetWidthPx = (sheet?.width ?? 431.8) * PIXELS_PER_MM;
   const sheetHeightPx = (sheet?.height ?? 279.4) * PIXELS_PER_MM;
@@ -96,19 +112,32 @@ export function SchematicCanvas({ sheetId, containerWidth, containerHeight, onAr
         onArrowClick?.(pos);
         return;
       }
+      if (activeTool === "revisionCloud") {
+        cloudClick(e);
+        return;
+      }
       if (e.target === stageRef.current || e.target.name() === "sheet-bg") {
         clearSelection();
       }
     },
-    [activeTool, symbolClick, clearSelection, viewport, onArrowClick]
+    [activeTool, symbolClick, clearSelection, viewport, onArrowClick, cloudClick]
   );
 
   const handleMouseMove = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
       wireMoveMove(e);
       symbolMouseMove(e);
+      cloudMouseMove(e);
     },
-    [wireMoveMove, symbolMouseMove]
+    [wireMoveMove, symbolMouseMove, cloudMouseMove]
+  );
+
+  const handleDoubleClick = useCallback(
+    (e: Konva.KonvaEventObject<MouseEvent>) => {
+      wireDoubleClick();
+      cloudDoubleClick(e);
+    },
+    [wireDoubleClick, cloudDoubleClick]
   );
 
   const handleKeyDown = useCallback(
@@ -118,6 +147,7 @@ export function SchematicCanvas({ sheetId, containerWidth, containerHeight, onAr
 
       if (e.key === "Escape") {
         cancelWire();
+        cancelCloud();
         setActiveTool("select");
       }
 
@@ -130,7 +160,6 @@ export function SchematicCanvas({ sheetId, containerWidth, containerHeight, onAr
           if (activeTool === "symbol") {
             rotatePendingSymbol();
           } else {
-            // Rotate selected symbols 90°
             selectedElementIds.forEach((id) => {
               const el = sheet?.elements.find((e) => e.id === id);
               if (el?.type === "symbol") {
@@ -141,7 +170,7 @@ export function SchematicCanvas({ sheetId, containerWidth, containerHeight, onAr
         }
       }
     },
-    [cancelWire, setActiveTool, selectedElementIds, removeElement, sheetId, clearSelection, activeTool, rotatePendingSymbol, sheet, updateElement]
+    [cancelWire, cancelCloud, setActiveTool, selectedElementIds, removeElement, sheetId, clearSelection, activeTool, rotatePendingSymbol, sheet, updateElement]
   );
 
   useEffect(() => {
@@ -151,10 +180,17 @@ export function SchematicCanvas({ sheetId, containerWidth, containerHeight, onAr
 
   const flatPreview = previewPoints.flatMap((p) => [p.x, p.y]);
 
+  // Revision cloud preview points (polygon + cursor)
+  const cloudPreviewPts = cloudPoints.length > 0 && cloudCursor
+    ? [...cloudPoints, cloudCursor]
+    : cloudPoints;
+  const flatCloudPreview = cloudPreviewPts.flatMap((p) => [p.x, p.y]);
+
   const cursorStyle =
     activeTool === "wire" ? "crosshair"
     : activeTool === "symbol" ? "copy"
     : activeTool === "pan" ? "grab"
+    : activeTool === "revisionCloud" ? "crosshair"
     : "default";
 
   if (!sheet) return null;
@@ -195,7 +231,22 @@ export function SchematicCanvas({ sheetId, containerWidth, containerHeight, onAr
 
       <WireLayer sheet={sheet} previewPoints={flatPreview} isDrawingWire={isDrawingWire} />
       <SymbolLayer sheet={sheet} />
-      <AnnotationLayer sheet={sheet} canvasWidth={sheetWidthPx} />
+      <AnnotationLayer sheet={sheet} canvasWidth={sheetWidthPx} canvasHeight={sheetHeightPx} />
+
+      {/* Revision cloud drawing preview */}
+      {activeTool === "revisionCloud" && cloudPoints.length > 0 && (
+        <Layer listening={false}>
+          <Line
+            points={flatCloudPreview}
+            stroke="#ff6600"
+            strokeWidth={1}
+            dash={[4, 2]}
+          />
+          {cloudPoints.map((p, i) => (
+            <Circle key={i} x={p.x} y={p.y} radius={3} fill="#ff6600" opacity={0.7} />
+          ))}
+        </Layer>
+      )}
     </Stage>
   );
 }
