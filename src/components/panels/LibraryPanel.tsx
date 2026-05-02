@@ -1,10 +1,15 @@
 import { useMemo } from "react";
 import { useLibraryStore } from "../../store/libraryStore";
 import { useCanvasStore } from "../../store/canvasStore";
+import { exportLibrary, importLibraryFile } from "../../lib/schlib";
 
 export function LibraryPanel() {
   const libraries = useLibraryStore((s) => s.libraries);
   const searchQuery = useLibraryStore((s) => s.searchQuery);
+  const setSearchQuery = useLibraryStore((s) => s.setSearchQuery);
+  const addSymbolToUserLibrary = useLibraryStore((s) => s.addSymbolToUserLibrary);
+  const setPendingSymbol = useCanvasStore((s) => s.setPendingSymbol);
+  const setActiveTool = useCanvasStore((s) => s.setActiveTool);
 
   const symbols = useMemo(() => {
     const all = libraries.flatMap((l) => l.symbols);
@@ -17,13 +22,25 @@ export function LibraryPanel() {
         s.tags.some((t) => t.toLowerCase().includes(q))
     );
   }, [libraries, searchQuery]);
-  const setSearchQuery = useLibraryStore((s) => s.setSearchQuery);
-  const setPendingSymbol = useCanvasStore((s) => s.setPendingSymbol);
-  const setActiveTool = useCanvasStore((s) => s.setActiveTool);
 
   const handleSelect = (defId: string) => {
     setPendingSymbol(defId);
     setActiveTool("symbol");
+  };
+
+  const userLib = libraries.find((l) => !l.isBuiltIn);
+
+  const handleExport = () => {
+    if (!userLib) return;
+    exportLibrary(userLib);
+  };
+
+  const handleImport = () => {
+    importLibraryFile()
+      .then((syms) => {
+        syms.forEach((s) => addSymbolToUserLibrary(s));
+      })
+      .catch((err: Error) => alert(err.message));
   };
 
   const byCategory = symbols.reduce<Record<string, typeof symbols>>((acc, sym) => {
@@ -36,6 +53,23 @@ export function LibraryPanel() {
     <div className="library-panel">
       <div className="panel-header">
         <span>Symbols</span>
+        <div className="panel-header-actions">
+          <button
+            className="icon-btn"
+            title="Import symbols from .schlib file"
+            onClick={handleImport}
+          >
+            ↑
+          </button>
+          <button
+            className="icon-btn"
+            title="Export user symbols to .schlib file"
+            onClick={handleExport}
+            disabled={!userLib || userLib.symbols.length === 0}
+          >
+            ↓
+          </button>
+        </div>
       </div>
       <input
         className="library-search"

@@ -1,22 +1,20 @@
 import { useThemeStore } from "../../store/themeStore";
-import { useHistoryStore } from "../../store/historyStore";
 import { useProjectStore } from "../../store/projectStore";
 import { saveProjectToFile, loadProjectFromFile } from "../../lib/projectIO";
 
 interface Props {
   onExportPDF: () => void;
   onEditTitleBlock: () => void;
+  onImportDxf: () => void;
 }
 
-export function MenuBar({ onExportPDF, onEditTitleBlock }: Props) {
+export function MenuBar({ onExportPDF, onEditTitleBlock, onImportDxf }: Props) {
   const toggleTheme = useThemeStore((s) => s.toggleTheme);
   const theme = useThemeStore((s) => s.theme);
-  const { canUndo, canRedo, undo, redo } = useHistoryStore();
-  const { project, isDirty } = useProjectStore();
+  const { project, isDirty, canUndo, canRedo, undo, redo } = useProjectStore();
   const setProject = useProjectStore((s) => s.setProject);
 
   const handleSave = () => saveProjectToFile(project);
-
   const handleLoad = () => {
     loadProjectFromFile()
       .then((loaded) => setProject(loaded))
@@ -39,6 +37,9 @@ export function MenuBar({ onExportPDF, onEditTitleBlock }: Props) {
         <button className="menu-btn" title="Open project (Ctrl+O)" onClick={handleLoad}>
           📂
         </button>
+        <button className="menu-btn" title="Import DXF" onClick={onImportDxf}>
+          DXF
+        </button>
         <div className="menu-separator" />
         <button className="menu-btn" title="Undo (Ctrl+Z)" disabled={!canUndo} onClick={undo}>
           ↩
@@ -46,6 +47,7 @@ export function MenuBar({ onExportPDF, onEditTitleBlock }: Props) {
         <button className="menu-btn" title="Redo (Ctrl+Y)" disabled={!canRedo} onClick={redo}>
           ↪
         </button>
+        <div className="menu-separator" />
         <button className="menu-btn" title="Export to PDF (Ctrl+P)" onClick={onExportPDF}>
           PDF
         </button>

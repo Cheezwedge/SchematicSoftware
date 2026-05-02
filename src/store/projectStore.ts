@@ -14,6 +14,8 @@ import {
 } from "../models/titleBlock";
 import type { TitleBlockData } from "../models/titleBlock";
 
+const MAX_SNAPSHOTS = 50;
+
 function makeDefaultLayers(): Layer[] {
   return DEFAULT_LAYERS.map((l) => ({ ...l, id: uuidv4() }));
 }
@@ -51,6 +53,14 @@ interface ProjectState {
   isDirty: boolean;
   filePath: string | null;
 
+  // Undo/redo via snapshots
+  _snapshots: Project[];
+  _future: Project[];
+  canUndo: boolean;
+  canRedo: boolean;
+  undo: () => void;
+  redo: () => void;
+
   setProject: (project: Project) => void;
   setFilePath: (path: string | null) => void;
   markDirty: () => void;
@@ -64,8 +74,10 @@ interface ProjectState {
   addElement: (sheetId: string, element: SchematicElement) => void;
   removeElement: (sheetId: string, elementId: string) => void;
   updateElement: (sheetId: string, elementId: string, updates: Partial<SchematicElement>) => void;
+  addElements: (sheetId: string, elements: SchematicElement[]) => void;
 
   addLayer: (sheetId: string, layer: Layer) => void;
+  addLayers: (sheetId: string, layers: Layer[]) => void;
   updateLayer: (sheetId: string, layerId: string, updates: Partial<Layer>) => void;
   removeLayer: (sheetId: string, layerId: string) => void;
 
@@ -80,16 +92,57 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   project: newProject(),
   isDirty: false,
   filePath: null,
+  _snapshots: [],
+  _future: [],
+  canUndo: false,
+  canRedo: false,
 
-  setProject: (project) => set({ project, isDirty: false }),
+  undo: () => {
+    const { _snapshots, project } = get();
+    if (!_snapshots.length) return;
+    const prev = _snapshots[_snapshots.length - 1];
+    set(
+      produce<ProjectState>((state) => {
+        state._future = [project, ...state._future].slice(0, MAX_SNAPSHOTS);
+        state._snapshots = state._snapshots.slice(0, -1);
+        state.project = prev as Project;
+        state.isDirty = true;
+        state.canUndo = state._snapshots.length > 0;
+        state.canRedo = true;
+      })
+    );
+  },
+
+  redo: () => {
+    const { _future, project } = get();
+    if (!_future.length) return;
+    const next = _future[0];
+    set(
+      produce<ProjectState>((state) => {
+        state._snapshots = [...state._snapshots, project].slice(-MAX_SNAPSHOTS);
+        state._future = state._future.slice(1);
+        state.project = next as Project;
+        state.isDirty = true;
+        state.canUndo = true;
+        state.canRedo = state._future.length > 0;
+      })
+    );
+  },
+
+  setProject: (project) => set({ project, isDirty: false, _snapshots: [], _future: [], canUndo: false, canRedo: false }),
   setFilePath: (filePath) => set({ filePath }),
   markDirty: () => set({ isDirty: true }),
   markSaved: () => set({ isDirty: false }),
 
   addSheet: () => {
     const id = uuidv4();
+    const snapshot = get().project;
     set(
       produce<ProjectState>((state) => {
+        state._snapshots = [...state._snapshots, snapshot].slice(-MAX_SNAPSHOTS);
+        state._future = [];
+        state.canUndo = true;
+        state.canRedo = false;
         const idx = state.project.sheets.length;
         state.project.sheets.push({ ...makeNewSheet(idx), id });
         state.project.modifiedAt = new Date().toISOString();
@@ -100,9 +153,14 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   },
 
   removeSheet: (sheetId) => {
+    const snapshot = get().project;
     set(
       produce<ProjectState>((state) => {
         if (state.project.sheets.length <= 1) return;
+        state._snapshots = [...state._snapshots, snapshot].slice(-MAX_SNAPSHOTS);
+        state._future = [];
+        state.canUndo = true;
+        state.canRedo = false;
         state.project.sheets = state.project.sheets.filter((s) => s.id !== sheetId);
         state.project.sheets.forEach((s, i) => (s.index = i));
         state.isDirty = true;
@@ -134,8 +192,13 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   },
 
   addElement: (sheetId, element) => {
+    const snapshot = get().project;
     set(
       produce<ProjectState>((state) => {
+        state._snapshots = [...state._snapshots, snapshot].slice(-MAX_SNAPSHOTS);
+        state._future = [];
+        state.canUndo = true;
+        state.canRedo = false;
         const sheet = state.project.sheets.find((s) => s.id === sheetId);
         if (sheet) { sheet.elements.push(element); state.isDirty = true; }
       })
@@ -143,8 +206,13 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   },
 
   removeElement: (sheetId, elementId) => {
+    const snapshot = get().project;
     set(
       produce<ProjectState>((state) => {
+        state._snapshots = [...state._snapshots, snapshot].slice(-MAX_SNAPSHOTS);
+        state._future = [];
+        state.canUndo = true;
+        state.canRedo = false;
         const sheet = state.project.sheets.find((s) => s.id === sheetId);
         if (sheet) {
           sheet.elements = sheet.elements.filter((e) => e.id !== elementId);
@@ -168,11 +236,42 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     );
   },
 
+  // Batch add for DXF import (one undo step for the entire import)
+  addElements: (sheetId, elements) => {
+    const snapshot = get().project;
+    set(
+      produce<ProjectState>((state) => {
+        state._snapshots = [...state._snapshots, snapshot].slice(-MAX_SNAPSHOTS);
+        state._future = [];
+        state.canUndo = true;
+        state.canRedo = false;
+        const sheet = state.project.sheets.find((s) => s.id === sheetId);
+        if (sheet) {
+          for (const el of elements) sheet.elements.push(el);
+          state.isDirty = true;
+        }
+      })
+    );
+  },
+
   addLayer: (sheetId, layer) => {
     set(
       produce<ProjectState>((state) => {
         const sheet = state.project.sheets.find((s) => s.id === sheetId);
         if (sheet) { sheet.layers.push(layer); state.isDirty = true; }
+      })
+    );
+  },
+
+  // Batch add layers for DXF import
+  addLayers: (sheetId, layers) => {
+    set(
+      produce<ProjectState>((state) => {
+        const sheet = state.project.sheets.find((s) => s.id === sheetId);
+        if (sheet) {
+          for (const l of layers) sheet.layers.push(l);
+          state.isDirty = true;
+        }
       })
     );
   },

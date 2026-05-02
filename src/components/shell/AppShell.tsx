@@ -10,6 +10,7 @@ import { DrawingToolbar } from "../toolbar/DrawingToolbar";
 import { DeviceInfoDialog } from "../dialogs/DeviceInfoDialog";
 import { CrossSheetArrowDialog } from "../dialogs/CrossSheetArrowDialog";
 import { TitleBlockEditor } from "../dialogs/TitleBlockEditor";
+import { ImportDxfDialog } from "../dialogs/ImportDxfDialog";
 import { SchematicCanvas } from "../../canvas/SchematicCanvas";
 import { useCanvasStore } from "../../store/canvasStore";
 import { useProjectStore } from "../../store/projectStore";
@@ -17,6 +18,8 @@ import { useLibraryStore } from "../../store/libraryStore";
 import { saveProjectToFile, loadProjectFromFile } from "../../lib/projectIO";
 import { exportSheetToPDF } from "../../lib/pdfExport";
 import { copyElements, pasteElements } from "../../lib/copyPaste";
+import { parseDxf, loadDxfFile } from "../../lib/dxfImport";
+import type { DxfImportResult } from "../../lib/dxfImport";
 import type { SymbolInstance } from "../../models/symbol";
 import type { CrossSheetArrow } from "../../models/crossSheetArrow";
 import type { Point } from "../../models/geometry";
@@ -26,6 +29,7 @@ export function AppShell() {
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
   const [arrowPendingPos, setArrowPendingPos] = useState<Point | null>(null);
   const [showTitleBlockEditor, setShowTitleBlockEditor] = useState(false);
+  const [dxfImport, setDxfImport] = useState<{ fileName: string; result: DxfImportResult } | null>(null);
 
   const activeSheetId = useCanvasStore((s) => s.activeSheetId);
   const setActiveSheet = useCanvasStore((s) => s.setActiveSheet);
@@ -41,8 +45,12 @@ export function AppShell() {
 
   const project = useProjectStore((s) => s.project);
   const addElement = useProjectStore((s) => s.addElement);
+  const addElements = useProjectStore((s) => s.addElements);
+  const addLayers = useProjectStore((s) => s.addLayers);
   const setProject = useProjectStore((s) => s.setProject);
   const getActiveLayer = useProjectStore((s) => s.getActiveLayer);
+  const undo = useProjectStore((s) => s.undo);
+  const redo = useProjectStore((s) => s.redo);
 
   const libraries = useLibraryStore((s) => s.libraries);
 
@@ -72,25 +80,19 @@ export function AppShell() {
     (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;
       const inInput = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
-
       const ctrl = e.ctrlKey || e.metaKey;
 
-      if (ctrl && e.key === "s") {
-        e.preventDefault();
-        saveProjectToFile(project);
-      }
-      if (ctrl && e.key === "o") {
-        e.preventDefault();
-        loadProjectFromFile().then(setProject).catch(() => {});
-      }
+      if (ctrl && e.key === "s") { e.preventDefault(); saveProjectToFile(project); }
+      if (ctrl && e.key === "o") { e.preventDefault(); loadProjectFromFile().then(setProject).catch(() => {}); }
       if (ctrl && e.key === "p") {
         e.preventDefault();
         const sheet = project.sheets.find((s) => s.id === activeSheetId);
         if (sheet) exportSheetToPDF(sheet);
       }
+      if (ctrl && e.key === "z") { e.preventDefault(); undo(); }
+      if (ctrl && (e.key === "y" || (e.shiftKey && e.key === "z"))) { e.preventDefault(); redo(); }
 
       if (!inInput) {
-        // Copy
         if (ctrl && e.key === "c") {
           if (!activeSheetId || selectedElementIds.size === 0) return;
           const sheet = project.sheets.find((s) => s.id === activeSheetId);
@@ -98,7 +100,6 @@ export function AppShell() {
           const selected = sheet.elements.filter((el) => selectedElementIds.has(el.id));
           setClipboard(copyElements(selected).elements);
         }
-        // Paste
         if (ctrl && e.key === "v") {
           if (!clipboard || !activeSheetId) return;
           const sheet = project.sheets.find((s) => s.id === activeSheetId);
@@ -117,7 +118,7 @@ export function AppShell() {
         }
       }
     },
-    [project, setProject, activeSheetId, selectedElementIds, clipboard, setClipboard, addElement, clearSelection]
+    [project, setProject, activeSheetId, selectedElementIds, clipboard, setClipboard, addElement, clearSelection, undo, redo]
   );
 
   useEffect(() => {
@@ -149,7 +150,7 @@ export function AppShell() {
     [pendingPlacement, activeSheetId, getActiveLayer, project, addElement, setPendingPlacement]
   );
 
-  // Cross-sheet arrow placement — canvas click sets pending pos, dialog confirms
+  // Cross-sheet arrow placement
   const handleArrowClick = useCallback(
     (pos: Point) => {
       if (activeTool === "sourceArrow" || activeTool === "destArrow") {
@@ -183,6 +184,51 @@ export function AppShell() {
     [arrowPendingPos, activeSheetId, activeTool, getActiveLayer, project, addElement, setActiveTool]
   );
 
+  // DXF import
+  const handleImportDxf = useCallback(() => {
+    loadDxfFile()
+      .then(({ content, name }) => {
+        const result = parseDxf(content);
+        setDxfImport({ fileName: name, result });
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleConfirmDxf = useCallback(
+    (selectedLayerIds: Set<string>) => {
+      if (!dxfImport || !activeSheetId) return;
+      const { result } = dxfImport;
+
+      // Add only the selected layers (avoid duplicating names already on sheet)
+      const sheet = project.sheets.find((s) => s.id === activeSheetId);
+      const existingLayerNames = new Set(sheet?.layers.map((l) => l.name) ?? []);
+      const newLayers = result.layers.filter(
+        (l) => selectedLayerIds.has(l.id) && !existingLayerNames.has(l.name)
+      );
+
+      // Remap layerIds: if a layer name already exists on the sheet, use the existing layer's id
+      const nameToSheetLayerId = new Map(sheet?.layers.map((l) => [l.name, l.id]) ?? []);
+      const importIdToSheetId = new Map<string, string>();
+      for (const l of result.layers) {
+        const existing = nameToSheetLayerId.get(l.name);
+        importIdToSheetId.set(l.id, existing ?? l.id);
+      }
+
+      const elements = result.elements
+        .filter((e) => selectedLayerIds.has(e.layerId))
+        .map((e) => ({
+          ...e,
+          sheetId: activeSheetId,
+          layerId: importIdToSheetId.get(e.layerId) ?? e.layerId,
+        }));
+
+      if (newLayers.length > 0) addLayers(activeSheetId, newLayers);
+      addElements(activeSheetId, elements);
+      setDxfImport(null);
+    },
+    [dxfImport, activeSheetId, project, addLayers, addElements]
+  );
+
   const pendingDef = pendingPlacement
     ? libraries.flatMap((l) => l.symbols).find((s) => s.id === pendingPlacement.definitionId)
     : null;
@@ -195,6 +241,7 @@ export function AppShell() {
           if (sheet) exportSheetToPDF(sheet);
         }}
         onEditTitleBlock={() => setShowTitleBlockEditor(true)}
+        onImportDxf={handleImportDxf}
       />
       <div className="app-body">
         <aside className="sidebar sidebar--left">
@@ -231,6 +278,15 @@ export function AppShell() {
 
       {showTitleBlockEditor && (
         <TitleBlockEditor onClose={() => setShowTitleBlockEditor(false)} />
+      )}
+
+      {dxfImport && (
+        <ImportDxfDialog
+          fileName={dxfImport.fileName}
+          result={dxfImport.result}
+          onImport={handleConfirmDxf}
+          onCancel={() => setDxfImport(null)}
+        />
       )}
 
       {arrowPendingPos && (activeTool === "sourceArrow" || activeTool === "destArrow") && (
