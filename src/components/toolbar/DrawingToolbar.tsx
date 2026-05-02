@@ -1,58 +1,74 @@
 import { useCanvasStore, type Tool } from "../../store/canvasStore";
+import { useProjectStore } from "../../store/projectStore";
 
 const TOOLS: { id: Tool; label: string; title: string }[] = [
-  { id: "select", label: "↖", title: "Select (S)" },
-  { id: "wire", label: "⌇", title: "Draw Wire (W)" },
-  { id: "pan", label: "✋", title: "Pan (Space)" },
+  { id: "select",  label: "↖", title: "Select (S)" },
+  { id: "wire",    label: "⌇", title: "Draw Wire (W)" },
+  { id: "pan",     label: "✋", title: "Pan (Space)" },
+];
+
+const RUNG_TOOLS: { id: Tool; label: string; title: string }[] = [
+  { id: "rungH", label: "═", title: "Horizontal Rung / Rail (H) — click start, click end, double-click to finish" },
+  { id: "rungV", label: "‖", title: "Vertical Bus / Rail (V) — click start, click end, double-click to finish" },
 ];
 
 const ARROW_TOOLS: { id: Tool; label: string; title: string }[] = [
-  { id: "sourceArrow", label: "→", title: "Source Arrow (wire continues to another sheet)" },
-  { id: "destArrow", label: "←", title: "Destination Arrow (wire comes from another sheet)" },
+  { id: "sourceArrow", label: "→", title: "Source Arrow — wire continues to another sheet" },
+  { id: "destArrow",   label: "←", title: "Destination Arrow — wire comes from another sheet" },
 ];
 
 const ANNOTATION_TOOLS: { id: Tool; label: string; title: string }[] = [
-  { id: "revisionCloud", label: "☁", title: "Revision Cloud — click vertices, double-click to close" },
+  { id: "revisionCloud", label: "☁", title: "Revision Cloud (click vertices, double-click to close)" },
 ];
 
-export function DrawingToolbar() {
+function ToolGroup({ tools }: { tools: typeof TOOLS }) {
   const activeTool = useCanvasStore((s) => s.activeTool);
   const setActiveTool = useCanvasStore((s) => s.setActiveTool);
+  return (
+    <>
+      {tools.map((tool) => (
+        <button
+          key={tool.id}
+          className={`tool-btn ${activeTool === tool.id ? "tool-btn--active" : ""}`}
+          title={tool.title}
+          onClick={() => setActiveTool(tool.id)}
+        >
+          {tool.label}
+        </button>
+      ))}
+    </>
+  );
+}
+
+export function DrawingToolbar() {
+  const showGrid = useProjectStore((s) => s.project.settings.showGrid);
+  const snapEnabled = useProjectStore((s) => s.project.settings.snapEnabled);
+  const updateSettings = useProjectStore((s) => s.updateSettings);
 
   return (
     <div className="drawing-toolbar">
-      {TOOLS.map((tool) => (
-        <button
-          key={tool.id}
-          className={`tool-btn ${activeTool === tool.id ? "tool-btn--active" : ""}`}
-          title={tool.title}
-          onClick={() => setActiveTool(tool.id)}
-        >
-          {tool.label}
-        </button>
-      ))}
+      <ToolGroup tools={TOOLS} />
       <div className="toolbar-divider" />
-      {ARROW_TOOLS.map((tool) => (
-        <button
-          key={tool.id}
-          className={`tool-btn ${activeTool === tool.id ? "tool-btn--active" : ""}`}
-          title={tool.title}
-          onClick={() => setActiveTool(tool.id)}
-        >
-          {tool.label}
-        </button>
-      ))}
+      <ToolGroup tools={RUNG_TOOLS} />
       <div className="toolbar-divider" />
-      {ANNOTATION_TOOLS.map((tool) => (
-        <button
-          key={tool.id}
-          className={`tool-btn ${activeTool === tool.id ? "tool-btn--active" : ""}`}
-          title={tool.title}
-          onClick={() => setActiveTool(tool.id)}
-        >
-          {tool.label}
-        </button>
-      ))}
+      <ToolGroup tools={ARROW_TOOLS} />
+      <div className="toolbar-divider" />
+      <ToolGroup tools={ANNOTATION_TOOLS} />
+      <div className="toolbar-divider" />
+      <button
+        className={`tool-btn ${showGrid ? "tool-btn--active" : ""}`}
+        title="Toggle grid (G)"
+        onClick={() => updateSettings({ showGrid: !showGrid })}
+      >
+        ⊞
+      </button>
+      <button
+        className={`tool-btn ${snapEnabled ? "tool-btn--active" : ""}`}
+        title="Toggle snap to grid (Q)"
+        onClick={() => updateSettings({ snapEnabled: !snapEnabled })}
+      >
+        ✦
+      </button>
     </div>
   );
 }

@@ -11,6 +11,7 @@ import { DeviceInfoDialog } from "../dialogs/DeviceInfoDialog";
 import { CrossSheetArrowDialog } from "../dialogs/CrossSheetArrowDialog";
 import { TitleBlockEditor } from "../dialogs/TitleBlockEditor";
 import { ImportDxfDialog } from "../dialogs/ImportDxfDialog";
+import { SettingsDialog } from "../dialogs/SettingsDialog";
 import { SchematicCanvas } from "../../canvas/SchematicCanvas";
 import { useCanvasStore } from "../../store/canvasStore";
 import { useProjectStore } from "../../store/projectStore";
@@ -29,6 +30,7 @@ export function AppShell() {
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
   const [arrowPendingPos, setArrowPendingPos] = useState<Point | null>(null);
   const [showTitleBlockEditor, setShowTitleBlockEditor] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [dxfImport, setDxfImport] = useState<{ fileName: string; result: DxfImportResult } | null>(null);
 
   const activeSheetId = useCanvasStore((s) => s.activeSheetId);
@@ -242,6 +244,7 @@ export function AppShell() {
         }}
         onEditTitleBlock={() => setShowTitleBlockEditor(true)}
         onImportDxf={handleImportDxf}
+        onOpenSettings={() => setShowSettings(true)}
       />
       <div className="app-body">
         <aside className="sidebar sidebar--left">
@@ -287,6 +290,10 @@ export function AppShell() {
           onImport={handleConfirmDxf}
           onCancel={() => setDxfImport(null)}
         />
+      )}
+
+      {showSettings && (
+        <SettingsDialog onClose={() => setShowSettings(false)} />
       )}
 
       {arrowPendingPos && (activeTool === "sourceArrow" || activeTool === "destArrow") && (

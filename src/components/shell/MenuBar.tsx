@@ -6,9 +6,10 @@ interface Props {
   onExportPDF: () => void;
   onEditTitleBlock: () => void;
   onImportDxf: () => void;
+  onOpenSettings: () => void;
 }
 
-export function MenuBar({ onExportPDF, onEditTitleBlock, onImportDxf }: Props) {
+export function MenuBar({ onExportPDF, onEditTitleBlock, onImportDxf, onOpenSettings }: Props) {
   const toggleTheme = useThemeStore((s) => s.toggleTheme);
   const theme = useThemeStore((s) => s.theme);
   const { project, isDirty, canUndo, canRedo, undo, redo } = useProjectStore();
@@ -53,6 +54,10 @@ export function MenuBar({ onExportPDF, onEditTitleBlock, onImportDxf }: Props) {
         </button>
         <button className="menu-btn" title="Edit title block for current sheet" onClick={onEditTitleBlock}>
           TB
+        </button>
+        <div className="menu-separator" />
+        <button className="menu-btn" title="Settings" onClick={onOpenSettings}>
+          ⚙
         </button>
         <div className="menu-separator" />
         <button className="menu-btn" title="Toggle theme" onClick={toggleTheme}>

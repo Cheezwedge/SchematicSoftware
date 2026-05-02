@@ -16,6 +16,9 @@ export interface ProjectSettings {
   wireNumberFormat: WireNumberFormat;
   rungNumberFormat: RungNumberFormat;
   gridSize: number;
+  showGrid: boolean;
+  snapEnabled: boolean;
+  snapIncrement: number;
 }
 
 export interface SymbolLibrary {
@@ -55,4 +58,7 @@ export const DEFAULT_PROJECT_SETTINGS: ProjectSettings = {
     position: "left",
   },
   gridSize: 5,
+  showGrid: true,
+  snapEnabled: true,
+  snapIncrement: 5,
 };
