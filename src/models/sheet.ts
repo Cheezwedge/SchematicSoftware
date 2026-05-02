@@ -3,8 +3,9 @@ import type { Wire } from "./wire";
 import type { SymbolInstance } from "./symbol";
 import type { RevisionCloud } from "./revision";
 import type { TitleBlockData } from "./titleBlock";
+import type { CrossSheetArrow } from "./crossSheetArrow";
 
-export type SchematicElement = Wire | SymbolInstance | RevisionCloud;
+export type SchematicElement = Wire | SymbolInstance | RevisionCloud | CrossSheetArrow;
 
 export interface Sheet {
   id: string;

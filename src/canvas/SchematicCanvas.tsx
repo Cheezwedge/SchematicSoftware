@@ -9,6 +9,8 @@ import { useWireTool } from "./hooks/useWireTool";
 import { useSymbolTool } from "./hooks/useSymbolTool";
 import { useCanvasStore } from "../store/canvasStore";
 import { useProjectStore } from "../store/projectStore";
+import { stageRegistry } from "./stageRef";
+import type { Point } from "../models/geometry";
 
 const PIXELS_PER_MM = 3.7795;
 const MIN_SCALE = 0.1;
@@ -19,9 +21,10 @@ interface Props {
   sheetId: string;
   containerWidth: number;
   containerHeight: number;
+  onArrowClick?: (pos: Point) => void;
 }
 
-export function SchematicCanvas({ sheetId, containerWidth, containerHeight }: Props) {
+export function SchematicCanvas({ sheetId, containerWidth, containerHeight, onArrowClick }: Props) {
   const stageRef = useRef<Konva.Stage>(null);
   const viewport = useCanvasStore((s) => s.viewport);
   const setViewport = useCanvasStore((s) => s.setViewport);
@@ -41,6 +44,12 @@ export function SchematicCanvas({ sheetId, containerWidth, containerHeight }: Pr
 
   const sheetWidthPx = (sheet?.width ?? 431.8) * PIXELS_PER_MM;
   const sheetHeightPx = (sheet?.height ?? 279.4) * PIXELS_PER_MM;
+
+  // Register stage in singleton so PDF export can access it
+  useEffect(() => {
+    if (stageRef.current) stageRegistry.current = stageRef.current;
+    return () => { stageRegistry.current = null; };
+  });
 
   useEffect(() => {
     if (!sheet) return;
@@ -75,11 +84,23 @@ export function SchematicCanvas({ sheetId, containerWidth, containerHeight }: Pr
         symbolClick(e);
         return;
       }
+      if (activeTool === "sourceArrow" || activeTool === "destArrow") {
+        const stage = stageRef.current;
+        if (!stage) return;
+        const pointer = stage.getPointerPosition();
+        if (!pointer) return;
+        const pos: Point = {
+          x: (pointer.x - viewport.x) / viewport.scale,
+          y: (pointer.y - viewport.y) / viewport.scale,
+        };
+        onArrowClick?.(pos);
+        return;
+      }
       if (e.target === stageRef.current || e.target.name() === "sheet-bg") {
         clearSelection();
       }
     },
-    [activeTool, symbolClick, clearSelection]
+    [activeTool, symbolClick, clearSelection, viewport, onArrowClick]
   );
 
   const handleMouseMove = useCallback(

@@ -1,7 +1,11 @@
+import { Fragment } from "react";
 import { Layer, Line, Text, Circle } from "react-konva";
+import type Konva from "konva";
 import type { Wire } from "../models/wire";
 import type { Sheet } from "../models/sheet";
 import { useCanvasStore } from "../store/canvasStore";
+import { useProjectStore } from "../store/projectStore";
+import { snapToGrid } from "./routing/orthogonalRouter";
 
 interface Props {
   sheet: Sheet;
@@ -22,9 +26,22 @@ function wireMidpoint(wire: Wire): { x: number; y: number } {
 export function WireLayer({ sheet, previewPoints, isDrawingWire }: Props) {
   const selectedIds = useCanvasStore((s) => s.selectedElementIds);
   const setSelection = useCanvasStore((s) => s.setSelection);
+  const activeTool = useCanvasStore((s) => s.activeTool);
+  const updateElement = useProjectStore((s) => s.updateElement);
+  const gridSize = useProjectStore((s) => s.project.settings.gridSize);
 
   const wires = sheet.elements.filter((e): e is Wire => e.type === "wire");
   const layerMap = new Map(sheet.layers.map((l) => [l.id, l]));
+
+  const handleWireDragEnd = (wire: Wire, e: Konva.KonvaEventObject<DragEvent>) => {
+    const dx = snapToGrid(e.target.x(), gridSize);
+    const dy = snapToGrid(e.target.y(), gridSize);
+    if (dx === 0 && dy === 0) return;
+    const newPoints = wire.points.map((p) => ({ x: p.x + dx, y: p.y + dy }));
+    e.target.x(0);
+    e.target.y(0);
+    updateElement(sheet.id, wire.id, { points: newPoints });
+  };
 
   return (
     <Layer>
@@ -34,6 +51,7 @@ export function WireLayer({ sheet, previewPoints, isDrawingWire }: Props) {
         const isSelected = selectedIds.has(wire.id);
         const flat = flattenPoints(wire.points);
         const mid = wireMidpoint(wire);
+        const isDraggable = activeTool === "select";
 
         return (
           <Fragment key={wire.id}>
@@ -41,8 +59,10 @@ export function WireLayer({ sheet, previewPoints, isDrawingWire }: Props) {
               points={flat}
               stroke={wire.color}
               strokeWidth={isSelected ? 3 : 1.5}
-              hitStrokeWidth={8}
+              hitStrokeWidth={10}
               onClick={() => setSelection([wire.id])}
+              draggable={isDraggable}
+              onDragEnd={(e) => handleWireDragEnd(wire, e)}
               listening={true}
               lineCap="round"
               lineJoin="round"
@@ -82,5 +102,3 @@ export function WireLayer({ sheet, previewPoints, isDrawingWire }: Props) {
     </Layer>
   );
 }
-
-import { Fragment } from "react";

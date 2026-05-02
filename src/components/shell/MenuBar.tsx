@@ -3,7 +3,11 @@ import { useHistoryStore } from "../../store/historyStore";
 import { useProjectStore } from "../../store/projectStore";
 import { saveProjectToFile, loadProjectFromFile } from "../../lib/projectIO";
 
-export function MenuBar() {
+interface Props {
+  onExportPDF: () => void;
+}
+
+export function MenuBar({ onExportPDF }: Props) {
   const toggleTheme = useThemeStore((s) => s.toggleTheme);
   const theme = useThemeStore((s) => s.theme);
   const { canUndo, canRedo, undo, redo } = useHistoryStore();
@@ -40,6 +44,9 @@ export function MenuBar() {
         </button>
         <button className="menu-btn" title="Redo (Ctrl+Y)" disabled={!canRedo} onClick={redo}>
           ↪
+        </button>
+        <button className="menu-btn" title="Export to PDF (Ctrl+P)" onClick={onExportPDF}>
+          PDF
         </button>
         <div className="menu-separator" />
         <button className="menu-btn" title="Toggle theme" onClick={toggleTheme}>

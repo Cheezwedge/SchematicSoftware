@@ -8,22 +8,34 @@ import { LibraryPanel } from "../panels/LibraryPanel";
 import { PropertiesPanel } from "../panels/PropertiesPanel";
 import { DrawingToolbar } from "../toolbar/DrawingToolbar";
 import { DeviceInfoDialog } from "../dialogs/DeviceInfoDialog";
+import { CrossSheetArrowDialog } from "../dialogs/CrossSheetArrowDialog";
 import { SchematicCanvas } from "../../canvas/SchematicCanvas";
 import { useCanvasStore } from "../../store/canvasStore";
 import { useProjectStore } from "../../store/projectStore";
 import { useLibraryStore } from "../../store/libraryStore";
 import { saveProjectToFile, loadProjectFromFile } from "../../lib/projectIO";
+import { exportSheetToPDF } from "../../lib/pdfExport";
+import { copyElements, pasteElements } from "../../lib/copyPaste";
 import type { SymbolInstance } from "../../models/symbol";
+import type { CrossSheetArrow } from "../../models/crossSheetArrow";
+import type { Point } from "../../models/geometry";
 
 export function AppShell() {
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
+  const [arrowPendingPos, setArrowPendingPos] = useState<Point | null>(null);
 
   const activeSheetId = useCanvasStore((s) => s.activeSheetId);
   const setActiveSheet = useCanvasStore((s) => s.setActiveSheet);
   const setActiveLayer = useCanvasStore((s) => s.setActiveLayer);
+  const activeTool = useCanvasStore((s) => s.activeTool);
+  const setActiveTool = useCanvasStore((s) => s.setActiveTool);
   const pendingPlacement = useCanvasStore((s) => s.pendingPlacement);
   const setPendingPlacement = useCanvasStore((s) => s.setPendingPlacement);
+  const selectedElementIds = useCanvasStore((s) => s.selectedElementIds);
+  const clipboard = useCanvasStore((s) => s.clipboard);
+  const setClipboard = useCanvasStore((s) => s.setClipboard);
+  const clearSelection = useCanvasStore((s) => s.clearSelection);
 
   const project = useProjectStore((s) => s.project);
   const addElement = useProjectStore((s) => s.addElement);
@@ -53,21 +65,57 @@ export function AppShell() {
     return () => obs.disconnect();
   }, []);
 
-  // Global keyboard: Ctrl+S / Ctrl+O
+  // Global keyboard shortcuts
   const handleGlobalKey = useCallback(
     (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+      const tag = (e.target as HTMLElement).tagName;
+      const inInput = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+
+      const ctrl = e.ctrlKey || e.metaKey;
+
+      if (ctrl && e.key === "s") {
         e.preventDefault();
         saveProjectToFile(project);
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === "o") {
+      if (ctrl && e.key === "o") {
         e.preventDefault();
-        loadProjectFromFile()
-          .then((loaded) => setProject(loaded))
-          .catch(() => {});
+        loadProjectFromFile().then(setProject).catch(() => {});
+      }
+      if (ctrl && e.key === "p") {
+        e.preventDefault();
+        const sheet = project.sheets.find((s) => s.id === activeSheetId);
+        if (sheet) exportSheetToPDF(sheet);
+      }
+
+      if (!inInput) {
+        // Copy
+        if (ctrl && e.key === "c") {
+          if (!activeSheetId || selectedElementIds.size === 0) return;
+          const sheet = project.sheets.find((s) => s.id === activeSheetId);
+          if (!sheet) return;
+          const selected = sheet.elements.filter((el) => selectedElementIds.has(el.id));
+          setClipboard(copyElements(selected).elements);
+        }
+        // Paste
+        if (ctrl && e.key === "v") {
+          if (!clipboard || !activeSheetId) return;
+          const sheet = project.sheets.find((s) => s.id === activeSheetId);
+          if (!sheet) return;
+          const existingNumbers = sheet.elements
+            .filter((el) => el.type === "wire")
+            .map((el) => (el as { number: string }).number);
+          const pasted = pasteElements(
+            { elements: clipboard },
+            activeSheetId,
+            existingNumbers,
+            project.settings.wireNumberFormat
+          );
+          pasted.forEach((el) => addElement(activeSheetId, el));
+          clearSelection();
+        }
       }
     },
-    [project, setProject]
+    [project, setProject, activeSheetId, selectedElementIds, clipboard, setClipboard, addElement, clearSelection]
   );
 
   useEffect(() => {
@@ -75,13 +123,12 @@ export function AppShell() {
     return () => window.removeEventListener("keydown", handleGlobalKey);
   }, [handleGlobalKey]);
 
-  // Confirm symbol placement from DeviceInfoDialog
+  // Symbol placement confirmation
   const handlePlaceSymbol = useCallback(
     (attributes: Record<string, string>) => {
       if (!pendingPlacement || !activeSheetId) return;
       const layer = getActiveLayer(activeSheetId);
       const sheet = project.sheets.find((s) => s.id === activeSheetId);
-
       const instance: SymbolInstance = {
         id: uuidv4(),
         type: "symbol",
@@ -94,17 +141,45 @@ export function AppShell() {
         scale: 1,
         attributes,
       };
-
       addElement(activeSheetId, instance);
       setPendingPlacement(null);
-      // Stay in symbol tool so user can keep placing
     },
     [pendingPlacement, activeSheetId, getActiveLayer, project, addElement, setPendingPlacement]
   );
 
-  const handleCancelPlacement = useCallback(() => {
-    setPendingPlacement(null);
-  }, [setPendingPlacement]);
+  // Cross-sheet arrow placement — canvas click sets pending pos, dialog confirms
+  const handleArrowClick = useCallback(
+    (pos: Point) => {
+      if (activeTool === "sourceArrow" || activeTool === "destArrow") {
+        setArrowPendingPos(pos);
+      }
+    },
+    [activeTool]
+  );
+
+  const handlePlaceArrow = useCallback(
+    (wireNumber: string, targetSheetId: string, targetSheetName: string) => {
+      if (!arrowPendingPos || !activeSheetId) return;
+      const layer = getActiveLayer(activeSheetId);
+      const sheet = project.sheets.find((s) => s.id === activeSheetId);
+      const arrow: CrossSheetArrow = {
+        id: uuidv4(),
+        type: "crossSheetArrow",
+        arrowType: activeTool === "sourceArrow" ? "source" : "destination",
+        sheetId: activeSheetId,
+        layerId: layer?.id ?? sheet?.layers[0]?.id ?? "",
+        x: arrowPendingPos.x,
+        y: arrowPendingPos.y,
+        wireNumber,
+        targetSheetId,
+        targetSheetName,
+      };
+      addElement(activeSheetId, arrow);
+      setArrowPendingPos(null);
+      setActiveTool("select");
+    },
+    [arrowPendingPos, activeSheetId, activeTool, getActiveLayer, project, addElement, setActiveTool]
+  );
 
   const pendingDef = pendingPlacement
     ? libraries.flatMap((l) => l.symbols).find((s) => s.id === pendingPlacement.definitionId)
@@ -112,7 +187,10 @@ export function AppShell() {
 
   return (
     <div className="app-shell">
-      <MenuBar />
+      <MenuBar onExportPDF={() => {
+        const sheet = project.sheets.find((s) => s.id === activeSheetId);
+        if (sheet) exportSheetToPDF(sheet);
+      }} />
       <div className="app-body">
         <aside className="sidebar sidebar--left">
           <DrawingToolbar />
@@ -125,6 +203,7 @@ export function AppShell() {
               sheetId={activeSheetId}
               containerWidth={canvasSize.width}
               containerHeight={canvasSize.height}
+              onArrowClick={handleArrowClick}
             />
           )}
         </main>
@@ -141,7 +220,15 @@ export function AppShell() {
         <DeviceInfoDialog
           definition={pendingDef}
           onConfirm={handlePlaceSymbol}
-          onCancel={handleCancelPlacement}
+          onCancel={() => setPendingPlacement(null)}
+        />
+      )}
+
+      {arrowPendingPos && (activeTool === "sourceArrow" || activeTool === "destArrow") && (
+        <CrossSheetArrowDialog
+          arrowType={activeTool === "sourceArrow" ? "source" : "destination"}
+          onConfirm={handlePlaceArrow}
+          onCancel={() => setArrowPendingPos(null)}
         />
       )}
     </div>

@@ -1,10 +1,13 @@
 import { useState, useEffect } from "react";
 import { Layer, Group, Image as KonvaImage, Text, Circle } from "react-konva";
+import type Konva from "konva";
 import type { SymbolInstance } from "../models/symbol";
 import type { Sheet } from "../models/sheet";
 import { useCanvasStore } from "../store/canvasStore";
 import { useLibraryStore } from "../store/libraryStore";
+import { useProjectStore } from "../store/projectStore";
 import { resolveConnectionPoints } from "../lib/transforms";
+import { snapToGrid } from "./routing/orthogonalRouter";
 
 const SYMBOL_SIZE = 60;
 
@@ -28,18 +31,29 @@ interface SymbolNodeProps {
   isSelected: boolean;
   onSelect: (id: string) => void;
   showConnectionPoints: boolean;
+  gridSize: number;
+  sheetId: string;
 }
 
-function SymbolNode({ instance, isSelected, onSelect, showConnectionPoints }: SymbolNodeProps) {
+function SymbolNode({ instance, isSelected, onSelect, showConnectionPoints, gridSize, sheetId }: SymbolNodeProps) {
   const def = useLibraryStore((s) =>
     s.libraries.flatMap((l) => l.symbols).find((sym) => sym.id === instance.definitionId)
   );
   const img = useSvgImage(def?.svgContent ?? "");
+  const updateElement = useProjectStore((s) => s.updateElement);
 
   if (!def || !img) return null;
 
   const half = SYMBOL_SIZE / 2;
   const resolved = resolveConnectionPoints(def.connectionPoints, 0, 0, instance.rotation);
+
+  const handleDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
+    const x = snapToGrid(e.target.x(), gridSize);
+    const y = snapToGrid(e.target.y(), gridSize);
+    e.target.x(x);
+    e.target.y(y);
+    updateElement(sheetId, instance.id, { x, y });
+  };
 
   return (
     <Group
@@ -48,7 +62,9 @@ function SymbolNode({ instance, isSelected, onSelect, showConnectionPoints }: Sy
       rotation={instance.rotation}
       scaleX={instance.scale}
       scaleY={instance.scale}
+      draggable
       onClick={() => onSelect(instance.id)}
+      onDragEnd={handleDragEnd}
       listening={true}
     >
       <KonvaImage
@@ -114,6 +130,7 @@ export function SymbolLayer({ sheet }: Props) {
   const selectedIds = useCanvasStore((s) => s.selectedElementIds);
   const setSelection = useCanvasStore((s) => s.setSelection);
   const activeTool = useCanvasStore((s) => s.activeTool);
+  const gridSize = useProjectStore((s) => s.project.settings.gridSize);
   const layerMap = new Map(sheet.layers.map((l) => [l.id, l]));
 
   const symbols = sheet.elements.filter((e): e is SymbolInstance => e.type === "symbol");
@@ -130,6 +147,8 @@ export function SymbolLayer({ sheet }: Props) {
             isSelected={selectedIds.has(sym.id)}
             onSelect={(id) => setSelection([id])}
             showConnectionPoints={activeTool === "wire"}
+            gridSize={gridSize}
+            sheetId={sheet.id}
           />
         );
       })}

@@ -1,7 +1,8 @@
 import { create } from "zustand";
 import type { Point } from "../models/geometry";
+import type { SchematicElement } from "../models/sheet";
 
-export type Tool = "select" | "wire" | "symbol" | "revisionCloud" | "pan";
+export type Tool = "select" | "wire" | "symbol" | "sourceArrow" | "destArrow" | "revisionCloud" | "pan";
 
 export interface PendingPlacement {
   pos: Point;
@@ -20,6 +21,7 @@ interface CanvasState {
   pendingPlacement: PendingPlacement | null;
   ghostPosition: Point | null;
   cursorPosition: Point | null;
+  clipboard: SchematicElement[] | null;
 
   setActiveSheet: (sheetId: string) => void;
   setActiveLayer: (layerId: string | null) => void;
@@ -35,6 +37,7 @@ interface CanvasState {
   setPendingPlacement: (placement: PendingPlacement | null) => void;
   setGhostPosition: (pos: Point | null) => void;
   setCursorPosition: (pos: Point | null) => void;
+  setClipboard: (elements: SchematicElement[]) => void;
 }
 
 export const useCanvasStore = create<CanvasState>()((set) => ({
@@ -48,6 +51,7 @@ export const useCanvasStore = create<CanvasState>()((set) => ({
   pendingPlacement: null,
   ghostPosition: null,
   cursorPosition: null,
+  clipboard: null,
 
   setActiveSheet: (activeSheetId) => set({ activeSheetId, selectedElementIds: new Set() }),
   setActiveLayer: (activeLayerId) => set({ activeLayerId }),
@@ -72,4 +76,5 @@ export const useCanvasStore = create<CanvasState>()((set) => ({
   setPendingPlacement: (pendingPlacement) => set({ pendingPlacement }),
   setGhostPosition: (ghostPosition) => set({ ghostPosition }),
   setCursorPosition: (cursorPosition) => set({ cursorPosition }),
+  setClipboard: (clipboard) => set({ clipboard }),
 }));
