@@ -1,0 +1,456 @@
+/* ===== CSS Custom Properties (Light mode defaults) ===== */
+:root,
+[data-theme="light"] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f5f5f5;
+  --bg-tertiary: #ebebeb;
+  --bg-active: #dde8f5;
+  --border: #d0d0d0;
+  --text-primary: #1a1a1a;
+  --text-secondary: #555555;
+  --text-muted: #888888;
+  --accent: #0066cc;
+  --accent-hover: #0052a3;
+  --danger: #cc3300;
+  --canvas-bg: #e8e8e8;
+  --toolbar-bg: #f0f0f0;
+  --sidebar-bg: #fafafa;
+  --menubar-bg: #2c2c2c;
+  --menubar-text: #f0f0f0;
+  --panel-header-bg: #ebebeb;
+  --shadow: rgba(0, 0, 0, 0.12);
+}
+
+[data-theme="dark"] {
+  --bg-primary: #1e1e1e;
+  --bg-secondary: #252525;
+  --bg-tertiary: #2e2e2e;
+  --bg-active: #1a3a5c;
+  --border: #404040;
+  --text-primary: #e8e8e8;
+  --text-secondary: #aaaaaa;
+  --text-muted: #666666;
+  --accent: #4da6ff;
+  --accent-hover: #79baff;
+  --danger: #ff6b6b;
+  --canvas-bg: #333333;
+  --toolbar-bg: #252525;
+  --sidebar-bg: #1e1e1e;
+  --menubar-bg: #111111;
+  --menubar-text: #e8e8e8;
+  --panel-header-bg: #2a2a2a;
+  --shadow: rgba(0, 0, 0, 0.4);
+}
+
+/* ===== Reset ===== */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+}
+
+/* ===== App Shell ===== */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+}
+
+.app-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ===== Menu Bar ===== */
+.menu-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 36px;
+  padding: 0 12px;
+  background: var(--menubar-bg);
+  color: var(--menubar-text);
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.menu-bar__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.menu-bar__app-name {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.menu-bar__project-name {
+  font-size: 12px;
+  color: #aaaaaa;
+}
+
+.menu-bar__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.menu-btn {
+  background: transparent;
+  border: none;
+  color: var(--menubar-text);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.menu-btn:hover:not(:disabled) {
+  background: rgba(255,255,255,0.12);
+}
+
+.menu-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.menu-separator {
+  width: 1px;
+  height: 16px;
+  background: #555;
+  margin: 0 4px;
+}
+
+/* ===== Sidebars ===== */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  background: var(--sidebar-bg);
+  border-color: var(--border);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.sidebar--left {
+  width: 200px;
+  border-right: 1px solid var(--border);
+}
+
+.sidebar--right {
+  width: 200px;
+  border-left: 1px solid var(--border);
+}
+
+/* ===== Canvas ===== */
+.canvas-container {
+  flex: 1;
+  overflow: hidden;
+  background: var(--canvas-bg);
+  position: relative;
+}
+
+/* ===== Status Bar ===== */
+.status-bar {
+  height: 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 12px;
+  background: var(--bg-tertiary);
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ===== Panel headers ===== */
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: var(--panel-header-bg);
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+
+/* ===== Drawing toolbar ===== */
+.drawing-toolbar {
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tool-btn {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-primary);
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.tool-btn:hover {
+  background: var(--bg-active);
+  border-color: var(--accent);
+}
+
+.tool-btn--active {
+  background: var(--bg-active);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ===== Sheet Navigator ===== */
+.sheet-navigator {
+  border-bottom: 1px solid var(--border);
+}
+
+.sheet-list {
+  list-style: none;
+  overflow-y: auto;
+  max-height: 160px;
+}
+
+.sheet-item {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+}
+
+.sheet-btn {
+  flex: 1;
+  background: none;
+  border: none;
+  padding: 6px 10px;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text-primary);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sheet-item--active .sheet-btn {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.sheet-item--active {
+  background: var(--bg-active);
+}
+
+.sheet-rename-input {
+  flex: 1;
+  padding: 4px 8px;
+  border: none;
+  border-bottom: 2px solid var(--accent);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 12px;
+  outline: none;
+}
+
+/* ===== Layer Panel ===== */
+.layer-panel {
+  flex: 1;
+}
+
+.layer-list {
+  list-style: none;
+  overflow-y: auto;
+}
+
+.layer-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.layer-item--active {
+  background: var(--bg-active);
+}
+
+.layer-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.layer-color {
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 3px;
+  padding: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.layer-name {
+  flex: 1;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.layer-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  font-size: 11px;
+  opacity: 0.35;
+  border-radius: 3px;
+}
+
+.layer-toggle.active {
+  opacity: 1;
+}
+
+.layer-toggle:hover {
+  background: var(--bg-tertiary);
+  opacity: 1;
+}
+
+/* ===== Library Panel ===== */
+.library-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.library-search {
+  margin: 6px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 12px;
+  outline: none;
+}
+
+.library-search:focus {
+  border-color: var(--accent);
+}
+
+.library-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.library-category {
+  margin-bottom: 8px;
+}
+
+.library-category__name {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 4px 4px 2px;
+  letter-spacing: 0.05em;
+}
+
+.library-category__symbols {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.symbol-thumb {
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  overflow: hidden;
+}
+
+.symbol-thumb svg {
+  width: 100%;
+  height: 100%;
+}
+
+.symbol-thumb:hover {
+  border-color: var(--accent);
+  background: var(--bg-active);
+}
+
+.library-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 12px;
+  text-align: center;
+}
+
+/* ===== Common buttons ===== */
+.icon-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1;
+}
+
+.icon-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.icon-btn--danger:hover {
+  background: rgba(204, 51, 0, 0.12);
+  color: var(--danger);
+}
+
+/* ===== Scrollbars ===== */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
