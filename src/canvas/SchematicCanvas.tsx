@@ -6,6 +6,7 @@ import { WireLayer } from "./WireLayer";
 import { SymbolLayer } from "./SymbolLayer";
 import { AnnotationLayer } from "./AnnotationLayer";
 import { useWireTool } from "./hooks/useWireTool";
+import { useSymbolTool } from "./hooks/useSymbolTool";
 import { useCanvasStore } from "../store/canvasStore";
 import { useProjectStore } from "../store/projectStore";
 
@@ -26,10 +27,17 @@ export function SchematicCanvas({ sheetId, containerWidth, containerHeight }: Pr
   const setViewport = useCanvasStore((s) => s.setViewport);
   const activeTool = useCanvasStore((s) => s.activeTool);
   const clearSelection = useCanvasStore((s) => s.clearSelection);
+  const selectedElementIds = useCanvasStore((s) => s.selectedElementIds);
+  const rotatePendingSymbol = useCanvasStore((s) => s.rotatePendingSymbol);
+  const setActiveTool = useCanvasStore((s) => s.setActiveTool);
   const sheet = useProjectStore((s) => s.getSheet(sheetId));
+  const removeElement = useProjectStore((s) => s.removeElement);
+  const updateElement = useProjectStore((s) => s.updateElement);
 
-  const { isDrawing: isDrawingWire, previewPoints, handleMouseDown, handleMouseMove, handleDoubleClick, cancel } =
+  const { isDrawing: isDrawingWire, previewPoints, handleMouseDown: wireMouseDown, handleMouseMove: wireMoveMove, handleDoubleClick, cancel: cancelWire } =
     useWireTool(sheetId);
+
+  const { handleMouseMove: symbolMouseMove, handleClick: symbolClick } = useSymbolTool();
 
   const sheetWidthPx = (sheet?.width ?? 431.8) * PIXELS_PER_MM;
   const sheetHeightPx = (sheet?.height ?? 279.4) * PIXELS_PER_MM;
@@ -40,6 +48,7 @@ export function SchematicCanvas({ sheetId, containerWidth, containerHeight }: Pr
     const x = (containerWidth - sheetWidthPx * scale) / 2;
     const y = (containerHeight - sheetHeightPx * scale) / 2;
     setViewport({ x, y, scale });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sheetId]);
 
   const handleWheel = useCallback(
@@ -47,40 +56,71 @@ export function SchematicCanvas({ sheetId, containerWidth, containerHeight }: Pr
       e.evt.preventDefault();
       const stage = stageRef.current;
       if (!stage) return;
-
       const oldScale = viewport.scale;
       const pointer = stage.getPointerPosition() ?? { x: 0, y: 0 };
       const mousePointTo = {
         x: (pointer.x - viewport.x) / oldScale,
         y: (pointer.y - viewport.y) / oldScale,
       };
-
       const direction = e.evt.deltaY < 0 ? 1 : -1;
       const newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, oldScale * (direction > 0 ? ZOOM_FACTOR : 1 / ZOOM_FACTOR)));
-
-      setViewport({
-        scale: newScale,
-        x: pointer.x - mousePointTo.x * newScale,
-        y: pointer.y - mousePointTo.y * newScale,
-      });
+      setViewport({ scale: newScale, x: pointer.x - mousePointTo.x * newScale, y: pointer.y - mousePointTo.y * newScale });
     },
     [viewport, setViewport]
   );
 
   const handleStageClick = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
+      if (activeTool === "symbol") {
+        symbolClick(e);
+        return;
+      }
       if (e.target === stageRef.current || e.target.name() === "sheet-bg") {
         clearSelection();
       }
     },
-    [clearSelection]
+    [activeTool, symbolClick, clearSelection]
+  );
+
+  const handleMouseMove = useCallback(
+    (e: Konva.KonvaEventObject<MouseEvent>) => {
+      wireMoveMove(e);
+      symbolMouseMove(e);
+    },
+    [wireMoveMove, symbolMouseMove]
   );
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      if (e.key === "Escape") cancel();
+      const tag = (e.target as HTMLElement).tagName;
+      const inInput = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+
+      if (e.key === "Escape") {
+        cancelWire();
+        setActiveTool("select");
+      }
+
+      if (!inInput) {
+        if (e.key === "Delete" || e.key === "Backspace") {
+          selectedElementIds.forEach((id) => removeElement(sheetId, id));
+          clearSelection();
+        }
+        if (e.key === "r" || e.key === "R") {
+          if (activeTool === "symbol") {
+            rotatePendingSymbol();
+          } else {
+            // Rotate selected symbols 90°
+            selectedElementIds.forEach((id) => {
+              const el = sheet?.elements.find((e) => e.id === id);
+              if (el?.type === "symbol") {
+                updateElement(sheetId, id, { rotation: ((el as { rotation: number }).rotation + 90) % 360 });
+              }
+            });
+          }
+        }
+      }
     },
-    [cancel]
+    [cancelWire, setActiveTool, selectedElementIds, removeElement, sheetId, clearSelection, activeTool, rotatePendingSymbol, sheet, updateElement]
   );
 
   useEffect(() => {
@@ -91,7 +131,10 @@ export function SchematicCanvas({ sheetId, containerWidth, containerHeight }: Pr
   const flatPreview = previewPoints.flatMap((p) => [p.x, p.y]);
 
   const cursorStyle =
-    activeTool === "wire" ? "crosshair" : activeTool === "pan" ? "grab" : "default";
+    activeTool === "wire" ? "crosshair"
+    : activeTool === "symbol" ? "copy"
+    : activeTool === "pan" ? "grab"
+    : "default";
 
   if (!sheet) return null;
 
@@ -106,14 +149,13 @@ export function SchematicCanvas({ sheetId, containerWidth, containerHeight }: Pr
       scaleY={viewport.scale}
       onWheel={handleWheel}
       onClick={handleStageClick}
-      onMouseDown={handleMouseDown}
+      onMouseDown={wireMouseDown}
       onMouseMove={handleMouseMove}
       onDblClick={handleDoubleClick}
       style={{ cursor: cursorStyle, background: "var(--canvas-bg)" }}
     >
       <GridLayer width={sheetWidthPx} height={sheetHeightPx} />
 
-      {/* Sheet boundary */}
       <Layer listening={false}>
         <Rect
           name="sheet-bg"

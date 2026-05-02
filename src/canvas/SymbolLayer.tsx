@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Layer, Group, Image as KonvaImage, Text, Circle } from "react-konva";
 import type { SymbolInstance } from "../models/symbol";
 import type { Sheet } from "../models/sheet";
@@ -9,17 +9,14 @@ import { resolveConnectionPoints } from "../lib/transforms";
 const SYMBOL_SIZE = 60;
 
 function useSvgImage(svgContent: string): HTMLImageElement | null {
-  const [img, setImg] = React.useState<HTMLImageElement | null>(null);
+  const [img, setImg] = useState<HTMLImageElement | null>(null);
 
   useEffect(() => {
     if (!svgContent) return;
     const blob = new Blob([svgContent], { type: "image/svg+xml" });
     const url = URL.createObjectURL(blob);
     const image = new Image();
-    image.onload = () => {
-      setImg(image);
-      URL.revokeObjectURL(url);
-    };
+    image.onload = () => { setImg(image); URL.revokeObjectURL(url); };
     image.src = url;
   }, [svgContent]);
 
@@ -90,6 +87,25 @@ function SymbolNode({ instance, isSelected, onSelect, showConnectionPoints }: Sy
   );
 }
 
+function GhostSymbol() {
+  const ghostPos = useCanvasStore((s) => s.ghostPosition);
+  const defId = useCanvasStore((s) => s.pendingSymbolDefinitionId);
+  const rotation = useCanvasStore((s) => s.pendingSymbolRotation);
+  const def = useLibraryStore((s) =>
+    defId ? s.libraries.flatMap((l) => l.symbols).find((sym) => sym.id === defId) : undefined
+  );
+  const img = useSvgImage(def?.svgContent ?? "");
+
+  if (!ghostPos || !def || !img) return null;
+
+  const half = SYMBOL_SIZE / 2;
+  return (
+    <Group x={ghostPos.x} y={ghostPos.y} rotation={rotation} opacity={0.5} listening={false}>
+      <KonvaImage image={img} x={-half} y={-half} width={SYMBOL_SIZE} height={SYMBOL_SIZE} />
+    </Group>
+  );
+}
+
 interface Props {
   sheet: Sheet;
 }
@@ -100,9 +116,7 @@ export function SymbolLayer({ sheet }: Props) {
   const activeTool = useCanvasStore((s) => s.activeTool);
   const layerMap = new Map(sheet.layers.map((l) => [l.id, l]));
 
-  const symbols = sheet.elements.filter(
-    (e): e is SymbolInstance => e.type === "symbol"
-  );
+  const symbols = sheet.elements.filter((e): e is SymbolInstance => e.type === "symbol");
 
   return (
     <Layer>
@@ -119,6 +133,7 @@ export function SymbolLayer({ sheet }: Props) {
           />
         );
       })}
+      {activeTool === "symbol" && <GhostSymbol />}
     </Layer>
   );
 }
