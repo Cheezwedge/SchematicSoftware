@@ -34,7 +34,9 @@ interface SymbolNodeProps {
 }
 
 function SymbolNode({ instance, isSelected, onSelect, showConnectionPoints }: SymbolNodeProps) {
-  const def = useLibraryStore((s) => s.getSymbolById(instance.definitionId));
+  const def = useLibraryStore((s) =>
+    s.libraries.flatMap((l) => l.symbols).find((sym) => sym.id === instance.definitionId)
+  );
   const img = useSvgImage(def?.svgContent ?? "");
 
   if (!def || !img) return null;

@@ -9,7 +9,9 @@ const SNAP_THRESHOLD = 12;
 
 export function useConnectionPoints(sheetId: string) {
   const sheet = useProjectStore((s) => s.getSheet(sheetId));
-  const getSymbolById = useLibraryStore((s) => s.getSymbolById);
+  const libraries = useLibraryStore((s) => s.libraries);
+  const getSymbolById = (id: string) =>
+    libraries.flatMap((l) => l.symbols).find((s) => s.id === id);
 
   function getAllConnectionPoints(): (ResolvedConnectionPoint & { instanceId: string })[] {
     if (!sheet) return [];

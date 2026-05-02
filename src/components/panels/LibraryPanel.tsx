@@ -1,9 +1,22 @@
+import { useMemo } from "react";
 import { useLibraryStore } from "../../store/libraryStore";
 import { useCanvasStore } from "../../store/canvasStore";
 
 export function LibraryPanel() {
-  const symbols = useLibraryStore((s) => s.getFilteredSymbols());
+  const libraries = useLibraryStore((s) => s.libraries);
   const searchQuery = useLibraryStore((s) => s.searchQuery);
+
+  const symbols = useMemo(() => {
+    const all = libraries.flatMap((l) => l.symbols);
+    if (!searchQuery.trim()) return all;
+    const q = searchQuery.toLowerCase();
+    return all.filter(
+      (s) =>
+        s.name.toLowerCase().includes(q) ||
+        s.category.toLowerCase().includes(q) ||
+        s.tags.some((t) => t.toLowerCase().includes(q))
+    );
+  }, [libraries, searchQuery]);
   const setSearchQuery = useLibraryStore((s) => s.setSearchQuery);
   const setPendingSymbol = useCanvasStore((s) => s.setPendingSymbol);
   const setActiveTool = useCanvasStore((s) => s.setActiveTool);
