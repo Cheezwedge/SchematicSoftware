@@ -6,22 +6,25 @@ import type { Sheet } from "../models/sheet";
 import { useCanvasStore } from "../store/canvasStore";
 import { useLibraryStore } from "../store/libraryStore";
 import { useProjectStore } from "../store/projectStore";
+import { useThemeStore } from "../store/themeStore";
 import { resolveConnectionPoints } from "../lib/transforms";
 import { snapToGrid } from "./routing/orthogonalRouter";
 
 const SYMBOL_SIZE = 60;
 
-function useSvgImage(svgContent: string): HTMLImageElement | null {
+// Replace `currentColor` in SVG so Konva's rasterised image has the correct color.
+function useSvgImage(svgContent: string, color: string): HTMLImageElement | null {
   const [img, setImg] = useState<HTMLImageElement | null>(null);
 
   useEffect(() => {
     if (!svgContent) return;
-    const blob = new Blob([svgContent], { type: "image/svg+xml" });
+    const resolved = svgContent.replace(/currentColor/g, color);
+    const blob = new Blob([resolved], { type: "image/svg+xml" });
     const url = URL.createObjectURL(blob);
     const image = new Image();
     image.onload = () => { setImg(image); URL.revokeObjectURL(url); };
     image.src = url;
-  }, [svgContent]);
+  }, [svgContent, color]);
 
   return img;
 }
@@ -33,13 +36,17 @@ interface SymbolNodeProps {
   showConnectionPoints: boolean;
   gridSize: number;
   sheetId: string;
+  /** Overrides the resolved SVG stroke/fill color (for theme support). */
+  symbolColor?: string;
 }
 
-export function SymbolNode({ instance, isSelected, onSelect, showConnectionPoints, gridSize, sheetId }: SymbolNodeProps) {
+export function SymbolNode({ instance, isSelected, onSelect, showConnectionPoints, gridSize, sheetId, symbolColor }: SymbolNodeProps) {
   const def = useLibraryStore((s) =>
     s.libraries.flatMap((l) => l.symbols).find((sym) => sym.id === instance.definitionId)
   );
-  const img = useSvgImage(def?.svgContent ?? "");
+  const theme = useThemeStore((s) => s.theme);
+  const effectiveColor = symbolColor ?? (theme === "dark" ? "#cccccc" : "#000000");
+  const img = useSvgImage(def?.svgContent ?? "", effectiveColor);
   const updateElement = useProjectStore((s) => s.updateElement);
 
   if (!def || !img) return null;
@@ -107,10 +114,12 @@ export function GhostSymbol() {
   const ghostPos = useCanvasStore((s) => s.ghostPosition);
   const defId = useCanvasStore((s) => s.pendingSymbolDefinitionId);
   const rotation = useCanvasStore((s) => s.pendingSymbolRotation);
+  const theme = useThemeStore((s) => s.theme);
   const def = useLibraryStore((s) =>
     defId ? s.libraries.flatMap((l) => l.symbols).find((sym) => sym.id === defId) : undefined
   );
-  const img = useSvgImage(def?.svgContent ?? "");
+  const color = theme === "dark" ? "#cccccc" : "#000000";
+  const img = useSvgImage(def?.svgContent ?? "", color);
 
   if (!ghostPos || !def || !img) return null;
 

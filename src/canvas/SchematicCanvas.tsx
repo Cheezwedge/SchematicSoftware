@@ -11,6 +11,7 @@ import { useRevisionCloudTool } from "./hooks/useRevisionCloudTool";
 import { useRungTool } from "./hooks/useRungTool";
 import { useCanvasStore } from "../store/canvasStore";
 import { useProjectStore } from "../store/projectStore";
+import { useThemeStore } from "../store/themeStore";
 import { stageRegistry } from "./stageRef";
 import type { Point } from "../models/geometry";
 import type { Wire } from "../models/wire";
@@ -39,6 +40,7 @@ export function SchematicCanvas({ sheetId, containerWidth, containerHeight, onAr
   const selectedElementIds = useCanvasStore((s) => s.selectedElementIds);
   const rotatePendingSymbol = useCanvasStore((s) => s.rotatePendingSymbol);
   const setActiveTool = useCanvasStore((s) => s.setActiveTool);
+  const theme = useThemeStore((s) => s.theme);
   const sheet = useProjectStore((s) => s.getSheet(sheetId));
   const removeElement = useProjectStore((s) => s.removeElement);
   const updateElement = useProjectStore((s) => s.updateElement);
@@ -330,8 +332,7 @@ export function SchematicCanvas({ sheetId, containerWidth, containerHeight, onAr
       onDblClick={handleDoubleClick}
       style={{ cursor: cursorStyle, background: "var(--canvas-bg)" }}
     >
-      <GridLayer width={sheetWidthPx} height={sheetHeightPx} />
-
+      {/* Sheet background — must be first so GridLayer renders on top of it */}
       <Layer listening={false}>
         <Rect
           name="sheet-bg"
@@ -339,14 +340,16 @@ export function SchematicCanvas({ sheetId, containerWidth, containerHeight, onAr
           y={0}
           width={sheetWidthPx}
           height={sheetHeightPx}
-          fill="white"
-          stroke="#999999"
+          fill={theme === "dark" ? "#1a1a1a" : "#ffffff"}
+          stroke={theme === "dark" ? "#555555" : "#999999"}
           strokeWidth={1}
           shadowColor="rgba(0,0,0,0.2)"
           shadowBlur={8}
           shadowOffset={{ x: 2, y: 2 }}
         />
       </Layer>
+
+      <GridLayer width={sheetWidthPx} height={sheetHeightPx} />
 
       <WireLayer sheet={sheet} previewPoints={flatPreview} isDrawingWire={isDrawingWire} />
       <SymbolLayer sheet={sheet} />

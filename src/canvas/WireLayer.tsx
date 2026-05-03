@@ -5,7 +5,18 @@ import type { Wire } from "../models/wire";
 import type { Sheet } from "../models/sheet";
 import { useCanvasStore } from "../store/canvasStore";
 import { useProjectStore } from "../store/projectStore";
+import { useThemeStore } from "../store/themeStore";
 import { snapToGrid } from "./routing/orthogonalRouter";
+
+function isHexDark(hex: string): boolean {
+  const r = parseInt(hex.slice(1, 3), 16) || 0;
+  const g = parseInt(hex.slice(3, 5), 16) || 0;
+  const b = parseInt(hex.slice(5, 7), 16) || 0;
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 < 0.4;
+}
+function resolveWireColor(color: string, dark: boolean): string {
+  return dark && isHexDark(color) ? "#cccccc" : color;
+}
 
 interface Props {
   sheet: Sheet;
@@ -29,6 +40,8 @@ export function WireLayer({ sheet, previewPoints, isDrawingWire }: Props) {
   const activeTool = useCanvasStore((s) => s.activeTool);
   const updateElement = useProjectStore((s) => s.updateElement);
   const gridSize = useProjectStore((s) => s.project.settings.gridSize);
+  const theme = useThemeStore((s) => s.theme);
+  const isDark = theme === "dark";
 
   const wires = sheet.elements.filter((e): e is Wire => e.type === "wire");
   const layerMap = new Map(sheet.layers.map((l) => [l.id, l]));
@@ -57,7 +70,7 @@ export function WireLayer({ sheet, previewPoints, isDrawingWire }: Props) {
           <Fragment key={wire.id}>
             <Line
               points={flat}
-              stroke={wire.color}
+              stroke={resolveWireColor(wire.color, isDark)}
               strokeWidth={isSelected ? 3 : 1.5}
               hitStrokeWidth={10}
               onClick={() => setSelection([wire.id])}
@@ -73,7 +86,7 @@ export function WireLayer({ sheet, previewPoints, isDrawingWire }: Props) {
                 y={mid.y - 10}
                 text={wire.number}
                 fontSize={8}
-                fill="#444444"
+                fill={isDark ? "#aaaaaa" : "#444444"}
                 listening={false}
               />
             )}

@@ -9,6 +9,7 @@ import { useRevisionCloudTool } from "./hooks/useRevisionCloudTool";
 import { useRungTool } from "./hooks/useRungTool";
 import { useCanvasStore } from "../store/canvasStore";
 import { useProjectStore } from "../store/projectStore";
+import { useThemeStore } from "../store/themeStore";
 import { stageRegistry } from "./stageRef";
 import { generateRevisionCloudPath } from "../lib/revisionCloud";
 import { snapToGrid } from "./routing/orthogonalRouter";
@@ -18,6 +19,16 @@ import type { SymbolInstance } from "../models/symbol";
 import type { RevisionCloud } from "../models/revision";
 import type { CrossSheetArrow } from "../models/crossSheetArrow";
 import type { Sheet } from "../models/sheet";
+
+function isHexDark(hex: string): boolean {
+  const r = parseInt(hex.slice(1, 3), 16) || 0;
+  const g = parseInt(hex.slice(3, 5), 16) || 0;
+  const b = parseInt(hex.slice(5, 7), 16) || 0;
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 < 0.4;
+}
+function resolveWireColor(color: string, theme: string): string {
+  return theme === "dark" && isHexDark(color) ? "#cccccc" : color;
+}
 
 const PIXELS_PER_MM = 3.7795;
 const SHEET_GAP = 60;
@@ -66,11 +77,15 @@ export function MultiSheetCanvas({ containerWidth, containerHeight, onArrowClick
   const rotatePendingSymbol = useCanvasStore((s) => s.rotatePendingSymbol);
   const setActiveTool = useCanvasStore((s) => s.setActiveTool);
 
+  const theme = useThemeStore((s) => s.theme);
   const project = useProjectStore((s) => s.project);
   const removeElement = useProjectStore((s) => s.removeElement);
   const updateElement = useProjectStore((s) => s.updateElement);
   const updateSettings = useProjectStore((s) => s.updateSettings);
   const gridSize = useProjectStore((s) => s.project.settings.gridSize);
+
+  const sheetBgColor = theme === "dark" ? "#1a1a1a" : "#ffffff";
+  const symbolColor = theme === "dark" ? "#cccccc" : "#000000";
 
   const [bandStart, setBandStart] = useState<Point | null>(null);
   const [bandCurrent, setBandCurrent] = useState<Point | null>(null);
@@ -464,9 +479,34 @@ export function MultiSheetCanvas({ containerWidth, containerHeight, onArrowClick
       onDblClick={handleDoubleClick}
       style={{ cursor: cursorStyle, background: "var(--canvas-bg)" }}
     >
+      {/* Layer 1: Sheet backgrounds (fill only — below the grid) */}
+      <Layer listening={false}>
+        {sheetLayouts.map(({ sheet, x: sx, widthPx, heightPx }) => (
+          <Group key={sheet.id} x={sx}>
+            <Rect
+              x={0} y={0}
+              width={widthPx}
+              height={heightPx}
+              fill={sheetBgColor}
+              shadowColor="rgba(0,0,0,0.15)"
+              shadowBlur={6}
+              shadowOffset={{ x: 2, y: 2 }}
+            />
+            <Text
+              x={0} y={LABEL_Y}
+              text={sheet.name}
+              fontSize={10}
+              fontStyle={sheet.id === activeSheetId ? "bold" : "normal"}
+              fill={sheet.id === activeSheetId ? "#0066cc" : theme === "dark" ? "#888888" : "#666666"}
+            />
+          </Group>
+        ))}
+      </Layer>
+
+      {/* Layer 2: Grid — visible on top of backgrounds, below content */}
       <GridLayer width={totalWidthPx} height={maxHeightPx} />
 
-      {/* All sheets in one layer, each in a positioned Group */}
+      {/* Layer 3: Content per sheet (transparent hit-test rect + wires/symbols/etc.) */}
       <Layer>
         {sheetLayouts.map(({ sheet, x: sx, widthPx, heightPx }) => {
           const isActive = sheet.id === activeSheetId;
@@ -478,30 +518,15 @@ export function MultiSheetCanvas({ containerWidth, containerHeight, onArrowClick
 
           return (
             <Group key={sheet.id} x={sx} y={0}>
-              {/* Sheet label */}
-              <Text
-                x={0}
-                y={LABEL_Y}
-                text={sheet.name}
-                fontSize={10}
-                fontStyle={isActive ? "bold" : "normal"}
-                fill={isActive ? "#0066cc" : "#666666"}
-                listening={false}
-              />
-
-              {/* Sheet border */}
+              {/* Transparent hit-test rect + border stroke (no fill — background is in layer 1) */}
               <Rect
                 name="sheet-bg"
-                x={0}
-                y={0}
+                x={0} y={0}
                 width={widthPx}
                 height={heightPx}
-                fill="white"
-                stroke={isActive ? "#0066cc" : "#aaaaaa"}
+                fill="transparent"
+                stroke={isActive ? "#0066cc" : theme === "dark" ? "#555555" : "#aaaaaa"}
                 strokeWidth={isActive ? 2 : 1}
-                shadowColor="rgba(0,0,0,0.15)"
-                shadowBlur={6}
-                shadowOffset={{ x: 2, y: 2 }}
               />
 
               {/* Wires */}
@@ -510,11 +535,12 @@ export function MultiSheetCanvas({ containerWidth, containerHeight, onArrowClick
                 if (lyr && !lyr.visible) return null;
                 const isSelected = selectedElementIds.has(wire.id);
                 const mid = wireMid(wire);
+                const displayColor = resolveWireColor(wire.color, theme);
                 return (
                   <Fragment key={wire.id}>
                     <Line
                       points={flatPts(wire.points)}
-                      stroke={wire.color}
+                      stroke={displayColor}
                       strokeWidth={isSelected ? 3 : 1.5}
                       hitStrokeWidth={10}
                       lineCap="round"
@@ -538,7 +564,7 @@ export function MultiSheetCanvas({ containerWidth, containerHeight, onArrowClick
                         y={mid.y - 10}
                         text={wire.number}
                         fontSize={8}
-                        fill="#444444"
+                        fill={theme === "dark" ? "#aaaaaa" : "#444444"}
                         listening={false}
                       />
                     )}
@@ -559,6 +585,7 @@ export function MultiSheetCanvas({ containerWidth, containerHeight, onArrowClick
                     showConnectionPoints={activeTool === "wire"}
                     gridSize={gridSize}
                     sheetId={sheet.id}
+                    symbolColor={symbolColor}
                   />
                 );
               })}
