@@ -13,6 +13,7 @@ import { TitleBlockEditor } from "../dialogs/TitleBlockEditor";
 import { ImportDxfDialog } from "../dialogs/ImportDxfDialog";
 import { SettingsDialog } from "../dialogs/SettingsDialog";
 import { SchematicCanvas } from "../../canvas/SchematicCanvas";
+import { MultiSheetCanvas } from "../../canvas/MultiSheetCanvas";
 import { useCanvasStore } from "../../store/canvasStore";
 import { useProjectStore } from "../../store/projectStore";
 import { useLibraryStore } from "../../store/libraryStore";
@@ -34,6 +35,7 @@ export function AppShell() {
   const [dxfImport, setDxfImport] = useState<{ fileName: string; result: DxfImportResult } | null>(null);
 
   const activeSheetId = useCanvasStore((s) => s.activeSheetId);
+  const viewMode = useCanvasStore((s) => s.viewMode);
   const setActiveSheet = useCanvasStore((s) => s.setActiveSheet);
   const setActiveLayer = useCanvasStore((s) => s.setActiveLayer);
   const activeTool = useCanvasStore((s) => s.activeTool);
@@ -253,9 +255,16 @@ export function AppShell() {
         </aside>
 
         <main className="canvas-container" ref={canvasContainerRef}>
-          {activeSheetId && (
+          {viewMode === "single" && activeSheetId && (
             <SchematicCanvas
               sheetId={activeSheetId}
+              containerWidth={canvasSize.width}
+              containerHeight={canvasSize.height}
+              onArrowClick={handleArrowClick}
+            />
+          )}
+          {viewMode === "multi" && (
+            <MultiSheetCanvas
               containerWidth={canvasSize.width}
               containerHeight={canvasSize.height}
               onArrowClick={handleArrowClick}

@@ -30,7 +30,9 @@ export function useWireTool(sheetId: string) {
   const getPointerPos = useCallback(
     (e: KonvaEventObject<MouseEvent>): Point => {
       const stage = e.target.getStage();
-      const pos = stage?.getRelativePointerPosition() ?? { x: 0, y: 0 };
+      const raw = stage?.getRelativePointerPosition() ?? { x: 0, y: 0 };
+      const { x: ox, y: oy } = useCanvasStore.getState().multiSheetOffset;
+      const pos = { x: raw.x - ox, y: raw.y - oy };
       const cp = snapToNearestConnectionPoint(pos);
       if (cp) return { x: cp.worldX, y: cp.worldY };
       return snap(pos);

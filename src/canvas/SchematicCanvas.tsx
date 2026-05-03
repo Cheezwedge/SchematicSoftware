@@ -85,6 +85,11 @@ export function SchematicCanvas({ sheetId, containerWidth, containerHeight, onAr
     return () => { stageRegistry.current = null; };
   });
 
+  // Ensure multi-sheet offset is zero when using single-sheet canvas
+  useEffect(() => {
+    useCanvasStore.getState().setMultiSheetOffset({ x: 0, y: 0 });
+  }, [sheetId]);
+
   useEffect(() => {
     if (!sheet) return;
     const scale = Math.min(containerWidth / sheetWidthPx, containerHeight / sheetHeightPx) * 0.9;

@@ -44,9 +44,27 @@ export function DrawingToolbar() {
   const showGrid = useProjectStore((s) => s.project.settings.showGrid);
   const snapEnabled = useProjectStore((s) => s.project.settings.snapEnabled);
   const updateSettings = useProjectStore((s) => s.updateSettings);
+  const viewMode = useCanvasStore((s) => s.viewMode);
+  const setViewMode = useCanvasStore((s) => s.setViewMode);
 
   return (
     <div className="drawing-toolbar">
+      {/* View mode toggle */}
+      <button
+        className={`tool-btn ${viewMode === "single" ? "tool-btn--active" : ""}`}
+        title="Single-sheet view (one sheet at a time)"
+        onClick={() => setViewMode("single")}
+      >
+        □
+      </button>
+      <button
+        className={`tool-btn ${viewMode === "multi" ? "tool-btn--active" : ""}`}
+        title="Multi-sheet view (all sheets side by side)"
+        onClick={() => setViewMode("multi")}
+      >
+        ⊟
+      </button>
+      <div className="toolbar-divider" />
       <ToolGroup tools={TOOLS} />
       <div className="toolbar-divider" />
       <ToolGroup tools={RUNG_TOOLS} />

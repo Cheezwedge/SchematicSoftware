@@ -35,7 +35,7 @@ interface SymbolNodeProps {
   sheetId: string;
 }
 
-function SymbolNode({ instance, isSelected, onSelect, showConnectionPoints, gridSize, sheetId }: SymbolNodeProps) {
+export function SymbolNode({ instance, isSelected, onSelect, showConnectionPoints, gridSize, sheetId }: SymbolNodeProps) {
   const def = useLibraryStore((s) =>
     s.libraries.flatMap((l) => l.symbols).find((sym) => sym.id === instance.definitionId)
   );
@@ -103,7 +103,7 @@ function SymbolNode({ instance, isSelected, onSelect, showConnectionPoints, grid
   );
 }
 
-function GhostSymbol() {
+export function GhostSymbol() {
   const ghostPos = useCanvasStore((s) => s.ghostPosition);
   const defId = useCanvasStore((s) => s.pendingSymbolDefinitionId);
   const rotation = useCanvasStore((s) => s.pendingSymbolRotation);

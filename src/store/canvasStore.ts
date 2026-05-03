@@ -3,6 +3,7 @@ import type { Point } from "../models/geometry";
 import type { SchematicElement } from "../models/sheet";
 
 export type Tool = "select" | "wire" | "symbol" | "sourceArrow" | "destArrow" | "revisionCloud" | "pan" | "rungH" | "rungV";
+export type ViewMode = "single" | "multi";
 
 export interface PendingPlacement {
   pos: Point;
@@ -14,6 +15,8 @@ interface CanvasState {
   activeSheetId: string | null;
   activeLayerId: string | null;
   activeTool: Tool;
+  viewMode: ViewMode;
+  multiSheetOffset: Point;
   selectedElementIds: Set<string>;
   viewport: { x: number; y: number; scale: number };
   pendingSymbolDefinitionId: string | null;
@@ -26,6 +29,8 @@ interface CanvasState {
   setActiveSheet: (sheetId: string) => void;
   setActiveLayer: (layerId: string | null) => void;
   setActiveTool: (tool: Tool) => void;
+  setViewMode: (mode: ViewMode) => void;
+  setMultiSheetOffset: (offset: Point) => void;
   setSelection: (ids: string[]) => void;
   addToSelection: (id: string) => void;
   removeFromSelection: (id: string) => void;
@@ -44,6 +49,8 @@ export const useCanvasStore = create<CanvasState>()((set) => ({
   activeSheetId: null,
   activeLayerId: null,
   activeTool: "select",
+  viewMode: "single",
+  multiSheetOffset: { x: 0, y: 0 },
   selectedElementIds: new Set(),
   viewport: { x: 0, y: 0, scale: 1 },
   pendingSymbolDefinitionId: null,
@@ -57,6 +64,8 @@ export const useCanvasStore = create<CanvasState>()((set) => ({
   setActiveLayer: (activeLayerId) => set({ activeLayerId }),
   setActiveTool: (activeTool) =>
     set({ activeTool, selectedElementIds: new Set(), pendingPlacement: null }),
+  setViewMode: (viewMode) => set({ viewMode, multiSheetOffset: { x: 0, y: 0 } }),
+  setMultiSheetOffset: (multiSheetOffset) => set({ multiSheetOffset }),
   setSelection: (ids) => set({ selectedElementIds: new Set(ids) }),
   addToSelection: (id) =>
     set((s) => ({ selectedElementIds: new Set([...s.selectedElementIds, id]) })),

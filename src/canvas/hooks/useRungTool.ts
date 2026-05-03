@@ -31,7 +31,8 @@ export function useRungTool(sheetId: string) {
     (e: Konva.KonvaEventObject<MouseEvent>): Point => {
       const stage = e.target.getStage();
       const raw = stage?.getRelativePointerPosition() ?? { x: 0, y: 0 };
-      return snap(raw);
+      const { x: ox, y: oy } = useCanvasStore.getState().multiSheetOffset;
+      return snap({ x: raw.x - ox, y: raw.y - oy });
     },
     [snap]
   );

@@ -21,7 +21,8 @@ export function useRevisionCloudTool(sheetId: string) {
     (e: Konva.KonvaEventObject<MouseEvent>): Point => {
       const stage = e.target.getStage();
       const raw = stage?.getRelativePointerPosition() ?? { x: 0, y: 0 };
-      return snapPointToGrid(raw, gridSize);
+      const { x: ox, y: oy } = useCanvasStore.getState().multiSheetOffset;
+      return snapPointToGrid({ x: raw.x - ox, y: raw.y - oy }, gridSize);
     },
     [gridSize]
   );

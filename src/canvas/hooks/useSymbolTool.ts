@@ -14,8 +14,9 @@ export function useSymbolTool() {
 
   const getPos = useCallback(
     (e: KonvaEventObject<MouseEvent>): Point => {
-      const pos = e.target.getStage()?.getRelativePointerPosition() ?? { x: 0, y: 0 };
-      return snap(pos);
+      const raw = e.target.getStage()?.getRelativePointerPosition() ?? { x: 0, y: 0 };
+      const { x: ox, y: oy } = useCanvasStore.getState().multiSheetOffset;
+      return snap({ x: raw.x - ox, y: raw.y - oy });
     },
     [snap]
   );
