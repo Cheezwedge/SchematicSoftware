@@ -1,5 +1,6 @@
 import { Fragment } from "react";
-import { Layer, Text, Path, Group, Rect, Line } from "react-konva";
+import { Layer, Text, Path, Group, Rect, Line, Shape } from "react-konva";
+import { useThemeStore } from "../store/themeStore";
 import type { Sheet } from "../models/sheet";
 import type { RevisionCloud } from "../models/revision";
 import type { CrossSheetArrow } from "../models/crossSheetArrow";
@@ -8,6 +9,47 @@ import { useCanvasStore } from "../store/canvasStore";
 import { generateRevisionCloudPath } from "../lib/revisionCloud";
 import { detectRungs } from "../lib/rungNumbering";
 import { BUILTIN_TEMPLATE_ID, DEFAULT_TITLE_BLOCK_FIELDS } from "../models/titleBlock";
+
+const HEX_W = 38;
+const HEX_H = 22;
+const HEX_NOTCH = 7; // diagonal cut width
+
+function HexRungBadge({ x, y, label, isDark }: { x: number; y: number; label: string; isDark: boolean }) {
+  return (
+    <Group x={x} y={y} listening={false}>
+      <Shape
+        sceneFunc={(ctx, shape) => {
+          const w = HEX_W / 2;
+          const h = HEX_H / 2;
+          const n = HEX_NOTCH;
+          ctx.beginPath();
+          ctx.moveTo(-w + n, -h);
+          ctx.lineTo(w - n, -h);
+          ctx.lineTo(w, 0);
+          ctx.lineTo(w - n, h);
+          ctx.lineTo(-w + n, h);
+          ctx.lineTo(-w, 0);
+          ctx.closePath();
+          ctx.fillStrokeShape(shape);
+        }}
+        fill={isDark ? "#1a1a3a" : "#eaeaff"}
+        stroke={isDark ? "#6666cc" : "#3333aa"}
+        strokeWidth={1.2}
+      />
+      <Text
+        x={-HEX_W / 2}
+        width={HEX_W}
+        align="center"
+        y={-5}
+        text={label}
+        fontSize={9}
+        fontStyle="bold"
+        fill={isDark ? "#aaaaff" : "#111166"}
+        listening={false}
+      />
+    </Group>
+  );
+}
 
 interface Props {
   sheet: Sheet;
@@ -156,13 +198,17 @@ export function AnnotationLayer({ sheet, canvasWidth, canvasHeight }: Props) {
   const settings = useProjectStore((s) => s.project.settings);
   const setActiveSheet = useCanvasStore((s) => s.setActiveSheet);
   const sheets = useProjectStore((s) => s.project.sheets);
+  const theme = useThemeStore((s) => s.theme);
+  const isDark = theme === "dark";
 
-  const rungs = detectRungs(sheet, settings.rungNumberFormat);
+  const sheetIndex = Math.max(0, sheets.findIndex((s) => s.id === sheet.id));
+  const rungs = detectRungs(sheet, settings.rungNumberFormat, sheetIndex);
   const revClouds = sheet.elements.filter((e): e is RevisionCloud => e.type === "revisionCloud");
   const arrows = sheet.elements.filter((e): e is CrossSheetArrow => e.type === "crossSheetArrow");
   const layerMap = new Map(sheet.layers.map((l) => [l.id, l]));
 
-  const RUNG_X = settings.rungNumberFormat.position === "left" ? 8 : canvasWidth - 30;
+  const isLeft = settings.rungNumberFormat.position === "left";
+  const RUNG_CENTER_X = isLeft ? HEX_W / 2 + 4 : canvasWidth - HEX_W / 2 - 4;
 
   const navigateTo = (targetSheetId: string) => {
     const target = sheets.find((s) => s.id === targetSheetId);
@@ -171,16 +217,14 @@ export function AnnotationLayer({ sheet, canvasWidth, canvasHeight }: Props) {
 
   return (
     <Layer>
-      {/* Rung numbers */}
+      {/* Rung hexagonal badges */}
       {rungs.map((rung) => (
-        <Text
+        <HexRungBadge
           key={rung.label}
-          x={RUNG_X}
-          y={rung.y - 6}
-          text={rung.label}
-          fontSize={10}
-          fill="#888888"
-          listening={false}
+          x={RUNG_CENTER_X}
+          y={rung.y}
+          label={rung.label}
+          isDark={isDark}
         />
       ))}
 

@@ -27,19 +27,18 @@ function wireLength(wire: Wire): number {
   return len;
 }
 
-export function detectRungs(sheet: Sheet, format: RungNumberFormat): RungInfo[] {
+export function detectRungs(sheet: Sheet, format: RungNumberFormat, sheetIndex: number): RungInfo[] {
   const wires = sheet.elements.filter((e): e is Wire => e.type === "wire");
   const horizontalWires = wires
     .filter((w) => isHorizontal(w) && wireLength(w) >= RUNG_WIRE_MIN_LENGTH)
     .sort((a, b) => a.points[0].y - b.points[0].y);
 
   const rungs: RungInfo[] = [];
-  let counter = format.startNumber;
+  let counter = (sheetIndex + 1) * 100;
 
   for (const wire of horizontalWires) {
     const y = wire.points[0].y;
-    const label = String(counter).padStart(3, "0");
-    rungs.push({ number: counter, y, label });
+    rungs.push({ number: counter, y, label: String(counter) });
     counter += format.increment;
   }
 
