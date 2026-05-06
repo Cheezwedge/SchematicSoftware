@@ -40,6 +40,19 @@ export function SettingsDialog({ onClose }: Props) {
         </div>
 
         <div className="dialog-body settings-body">
+          {/* ── Canvas ── */}
+          <section className="settings-section">
+            <h3 className="settings-section-title">Canvas</h3>
+            <label className="settings-row">
+              <span>Reverse scroll-wheel zoom</span>
+              <input
+                type="checkbox"
+                checked={local.invertZoom ?? false}
+                onChange={(e) => set("invertZoom", e.target.checked)}
+              />
+            </label>
+          </section>
+
           {/* ── Grid ── */}
           <section className="settings-section">
             <h3 className="settings-section-title">Grid</h3>

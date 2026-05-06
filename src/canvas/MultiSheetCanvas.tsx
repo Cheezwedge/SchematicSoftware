@@ -83,6 +83,7 @@ export function MultiSheetCanvas({ containerWidth, containerHeight, onArrowClick
   const updateElement = useProjectStore((s) => s.updateElement);
   const updateSettings = useProjectStore((s) => s.updateSettings);
   const gridSize = useProjectStore((s) => s.project.settings.gridSize);
+  const invertZoom = useProjectStore((s) => s.project.settings.invertZoom);
 
   const sheetBgColor = theme === "dark" ? "#1a1a1a" : "#ffffff";
   const symbolColor = theme === "dark" ? "#cccccc" : "#000000";
@@ -196,7 +197,7 @@ export function MultiSheetCanvas({ containerWidth, containerHeight, onArrowClick
         x: (pointer.x - viewport.x) / oldScale,
         y: (pointer.y - viewport.y) / oldScale,
       };
-      const dir = e.evt.deltaY < 0 ? 1 : -1;
+      const dir = (e.evt.deltaY < 0 ? 1 : -1) * (invertZoom ? -1 : 1);
       const newScale = Math.min(
         MAX_SCALE,
         Math.max(MIN_SCALE, oldScale * (dir > 0 ? ZOOM_FACTOR : 1 / ZOOM_FACTOR))
@@ -207,7 +208,7 @@ export function MultiSheetCanvas({ containerWidth, containerHeight, onArrowClick
         y: pointer.y - mousePointTo.y * newScale,
       });
     },
-    [viewport, setViewport]
+    [viewport, setViewport, invertZoom]
   );
 
   // ── Mouse events ──────────────────────────────────────────────────────

@@ -19,6 +19,7 @@ export interface ProjectSettings {
   showGrid: boolean;
   snapEnabled: boolean;
   snapIncrement: number;
+  invertZoom: boolean;
 }
 
 export interface SymbolLibrary {
@@ -61,4 +62,5 @@ export const DEFAULT_PROJECT_SETTINGS: ProjectSettings = {
   showGrid: true,
   snapEnabled: true,
   snapIncrement: 5,
+  invertZoom: false,
 };

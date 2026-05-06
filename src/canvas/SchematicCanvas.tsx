@@ -45,6 +45,7 @@ export function SchematicCanvas({ sheetId, containerWidth, containerHeight, onAr
   const removeElement = useProjectStore((s) => s.removeElement);
   const updateElement = useProjectStore((s) => s.updateElement);
   const updateSettings = useProjectStore((s) => s.updateSettings);
+  const invertZoom = useProjectStore((s) => s.project.settings.invertZoom);
 
   // Rubber-band selection state (in canvas/sheet coordinates)
   const [bandStart, setBandStart] = useState<Point | null>(null);
@@ -112,11 +113,11 @@ export function SchematicCanvas({ sheetId, containerWidth, containerHeight, onAr
         x: (pointer.x - viewport.x) / oldScale,
         y: (pointer.y - viewport.y) / oldScale,
       };
-      const direction = e.evt.deltaY < 0 ? 1 : -1;
+      const direction = (e.evt.deltaY < 0 ? 1 : -1) * (invertZoom ? -1 : 1);
       const newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, oldScale * (direction > 0 ? ZOOM_FACTOR : 1 / ZOOM_FACTOR)));
       setViewport({ scale: newScale, x: pointer.x - mousePointTo.x * newScale, y: pointer.y - mousePointTo.y * newScale });
     },
-    [viewport, setViewport]
+    [viewport, setViewport, invertZoom]
   );
 
   const handleMouseDown = useCallback(
