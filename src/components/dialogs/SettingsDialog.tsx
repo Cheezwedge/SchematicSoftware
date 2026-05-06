@@ -51,6 +51,28 @@ export function SettingsDialog({ onClose }: Props) {
                 onChange={(e) => set("invertZoom", e.target.checked)}
               />
             </label>
+            <label className="settings-row">
+              <span>Wire label size (px)</span>
+              <input
+                type="number"
+                className="settings-input"
+                min={6}
+                max={24}
+                value={local.wireLabelSize ?? 8}
+                onChange={(e) => set("wireLabelSize", Number(e.target.value))}
+              />
+            </label>
+            <label className="settings-row">
+              <span>Device label size (px)</span>
+              <input
+                type="number"
+                className="settings-input"
+                min={6}
+                max={24}
+                value={local.deviceLabelSize ?? 8}
+                onChange={(e) => set("deviceLabelSize", Number(e.target.value))}
+              />
+            </label>
           </section>
 
           {/* ── Grid ── */}

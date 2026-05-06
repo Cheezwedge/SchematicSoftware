@@ -20,6 +20,8 @@ export interface ProjectSettings {
   snapEnabled: boolean;
   snapIncrement: number;
   invertZoom: boolean;
+  wireLabelSize: number;
+  deviceLabelSize: number;
 }
 
 export interface SymbolLibrary {
@@ -63,4 +65,6 @@ export const DEFAULT_PROJECT_SETTINGS: ProjectSettings = {
   snapEnabled: true,
   snapIncrement: 5,
   invertZoom: false,
+  wireLabelSize: 8,
+  deviceLabelSize: 8,
 };

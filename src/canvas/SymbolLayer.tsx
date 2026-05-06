@@ -48,6 +48,7 @@ export function SymbolNode({ instance, isSelected, onSelect, showConnectionPoint
   const effectiveColor = symbolColor ?? (theme === "dark" ? "#cccccc" : "#000000");
   const img = useSvgImage(def?.svgContent ?? "", effectiveColor);
   const updateElement = useProjectStore((s) => s.updateElement);
+  const deviceLabelSize = useProjectStore((s) => s.project.settings.deviceLabelSize);
 
   if (!def || !img) return null;
 
@@ -88,8 +89,8 @@ export function SymbolNode({ instance, isSelected, onSelect, showConnectionPoint
           x={-half}
           y={half + 2}
           text={instance.attributes.tag}
-          fontSize={8}
-          fill="#222222"
+          fontSize={deviceLabelSize}
+          fill={theme === "dark" ? "#cccccc" : "#222222"}
           listening={false}
         />
       )}

@@ -40,6 +40,7 @@ export function WireLayer({ sheet, previewPoints, isDrawingWire }: Props) {
   const activeTool = useCanvasStore((s) => s.activeTool);
   const updateElement = useProjectStore((s) => s.updateElement);
   const gridSize = useProjectStore((s) => s.project.settings.gridSize);
+  const wireLabelSize = useProjectStore((s) => s.project.settings.wireLabelSize);
   const theme = useThemeStore((s) => s.theme);
   const isDark = theme === "dark";
 
@@ -85,7 +86,7 @@ export function WireLayer({ sheet, previewPoints, isDrawingWire }: Props) {
                 x={mid.x + 2}
                 y={mid.y - 10}
                 text={wire.number}
-                fontSize={8}
+                fontSize={wireLabelSize}
                 fill={isDark ? "#aaaaaa" : "#444444"}
                 listening={false}
               />

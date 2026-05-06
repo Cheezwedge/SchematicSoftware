@@ -5,11 +5,17 @@ interface Props {
   definition: SymbolDefinition;
   onConfirm: (attributes: Record<string, string>) => void;
   onCancel: () => void;
+  rungNumber?: string;
 }
 
-export function DeviceInfoDialog({ definition, onConfirm, onCancel }: Props) {
+export function DeviceInfoDialog({ definition, onConfirm, onCancel, rungNumber }: Props) {
   const [values, setValues] = useState<Record<string, string>>(() =>
-    Object.fromEntries(definition.attributes.map((a) => [a.name, a.defaultValue]))
+    Object.fromEntries(
+      definition.attributes.map((a) => [
+        a.name,
+        a.name === "tag" && rungNumber ? rungNumber : a.defaultValue,
+      ])
+    )
   );
 
   const handleSubmit = (e: React.FormEvent) => {

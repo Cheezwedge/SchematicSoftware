@@ -44,3 +44,12 @@ export function detectRungs(sheet: Sheet, format: RungNumberFormat, sheetIndex: 
 
   return rungs;
 }
+
+/** Returns the rung label closest in Y to the given coordinate, or null if no rungs exist. */
+export function rungNumberForY(sheet: Sheet, y: number, sheetIndex: number, format: RungNumberFormat): string | null {
+  const rungs = detectRungs(sheet, format, sheetIndex);
+  if (rungs.length === 0) return null;
+  return rungs.reduce((best, r) =>
+    Math.abs(r.y - y) < Math.abs(best.y - y) ? r : best
+  ).label;
+}

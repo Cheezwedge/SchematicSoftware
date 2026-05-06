@@ -4,6 +4,8 @@ import { v4 as uuidv4 } from "uuid";
 import type { Project, ProjectSettings } from "../models/project";
 import type { Sheet, SchematicElement } from "../models/sheet";
 import type { Layer } from "../models/layer";
+import type { Wire } from "../models/wire";
+import { DEFAULT_WIRE_COLOR, DEFAULT_WIRE_GAUGE } from "../models/wire";
 import { DEFAULT_LAYERS } from "../models/layer";
 import { DEFAULT_SHEET_WIDTH, DEFAULT_SHEET_HEIGHT } from "../models/sheet";
 import { DEFAULT_PROJECT_SETTINGS } from "../models/project";
@@ -15,13 +17,43 @@ import {
 import type { TitleBlockData } from "../models/titleBlock";
 
 const MAX_SNAPSHOTS = 50;
+const PIXELS_PER_MM = 3.7795;
+const RUNG_COUNT = 31; // 100-130 inclusive
+const RUNG_TOP_MARGIN = 30;
+const RUNG_BOTTOM_MARGIN = 80; // title block + padding
 
 function makeDefaultLayers(): Layer[] {
   return DEFAULT_LAYERS.map((l) => ({ ...l, id: uuidv4() }));
 }
 
+function makeRungWires(sheet: Sheet, sheetIndex: number): Wire[] {
+  const layerId = sheet.layers[0]?.id ?? "";
+  const sheetWidthPx = sheet.width * PIXELS_PER_MM;
+  const sheetHeightPx = sheet.height * PIXELS_PER_MM;
+  const available = sheetHeightPx - RUNG_TOP_MARGIN - RUNG_BOTTOM_MARGIN;
+  const spacing = available / (RUNG_COUNT - 1);
+  const startRung = (sheetIndex + 1) * 100;
+  const leftX = 50;
+  const rightX = Math.round(sheetWidthPx - 20);
+
+  return Array.from({ length: RUNG_COUNT }, (_, i) => {
+    const y = Math.round(RUNG_TOP_MARGIN + i * spacing);
+    return {
+      id: uuidv4(),
+      type: "wire" as const,
+      layerId,
+      sheetId: sheet.id,
+      points: [{ x: leftX, y }, { x: rightX, y }],
+      color: DEFAULT_WIRE_COLOR,
+      gauge: DEFAULT_WIRE_GAUGE,
+      number: String(startRung + i),
+      netId: uuidv4(),
+    };
+  });
+}
+
 function makeNewSheet(index: number): Sheet {
-  return {
+  const sheet: Sheet = {
     id: uuidv4(),
     name: `Sheet ${index + 1}`,
     index,
@@ -31,6 +63,8 @@ function makeNewSheet(index: number): Sheet {
     elements: [],
     titleBlockData: makeDefaultTitleBlockData(),
   };
+  sheet.elements = makeRungWires(sheet, index);
+  return sheet;
 }
 
 function newProject(): Project {
