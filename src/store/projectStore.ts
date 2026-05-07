@@ -108,6 +108,7 @@ interface ProjectState {
 
   getSheet: (sheetId: string) => Sheet | undefined;
   getActiveLayer: (sheetId: string) => Layer | undefined;
+  resetProject: () => string;
 }
 
 export const useProjectStore = create<ProjectState>()((set, get) => ({
@@ -344,5 +345,11 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   getActiveLayer: (sheetId) => {
     const sheet = get().project.sheets.find((s) => s.id === sheetId);
     return sheet?.layers.find((l) => l.visible && !l.locked);
+  },
+
+  resetProject: () => {
+    const p = newProject();
+    set({ project: p, isDirty: false, _snapshots: [], _future: [], canUndo: false, canRedo: false, filePath: null });
+    return p.sheets[0].id;
   },
 }));

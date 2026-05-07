@@ -17,6 +17,18 @@ const AttributeDefSchema = z.object({
   required: z.boolean(),
 });
 
+const GeomElSchema = z.discriminatedUnion("t", [
+  z.object({ t: z.literal("L"), x1: z.number(), y1: z.number(), x2: z.number(), y2: z.number() }),
+  z.object({ t: z.literal("C"), cx: z.number(), cy: z.number(), r: z.number() }),
+  z.object({
+    t: z.literal("A"),
+    x1: z.number(), y1: z.number(),
+    x2: z.number(), y2: z.number(),
+    r: z.number(),
+    large: z.union([z.literal(0), z.literal(1)]),
+  }),
+]);
+
 const SymbolSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -27,6 +39,7 @@ const SymbolSchema = z.object({
   connectionPoints: z.array(ConnectionPointSchema),
   attributes: z.array(AttributeDefSchema),
   tags: z.array(z.string()),
+  geometry: z.array(GeomElSchema).optional(),
 });
 
 const SchlibSchema = z.object({

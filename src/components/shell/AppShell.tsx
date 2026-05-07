@@ -27,6 +27,22 @@ import type { CrossSheetArrow } from "../../models/crossSheetArrow";
 import type { Point } from "../../models/geometry";
 import { rungNumberForXY } from "../../lib/rungNumbering";
 
+const MIN_PANEL = 140;
+const MAX_PANEL = 500;
+const DEFAULT_PANEL_WIDTH = 200;
+const PANEL_LS_KEY = "ss_panel_widths_v1";
+
+function loadPanelState() {
+  try {
+    const raw = localStorage.getItem(PANEL_LS_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as { lw: number; rw: number; lo: boolean; ro: boolean };
+  } catch { return null; }
+}
+function savePanelState(lw: number, rw: number, lo: boolean, ro: boolean) {
+  try { localStorage.setItem(PANEL_LS_KEY, JSON.stringify({ lw, rw, lo, ro })); } catch {}
+}
+
 export function AppShell() {
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
@@ -34,6 +50,47 @@ export function AppShell() {
   const [showTitleBlockEditor, setShowTitleBlockEditor] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [dxfImport, setDxfImport] = useState<{ fileName: string; result: DxfImportResult } | null>(null);
+
+  // Panel resize/toggle state
+  const savedPanel = loadPanelState();
+  const [leftWidth, setLeftWidth] = useState(savedPanel?.lw ?? DEFAULT_PANEL_WIDTH);
+  const [rightWidth, setRightWidth] = useState(savedPanel?.rw ?? DEFAULT_PANEL_WIDTH);
+  const [leftOpen, setLeftOpen] = useState(savedPanel?.lo ?? true);
+  const [rightOpen, setRightOpen] = useState(savedPanel?.ro ?? true);
+  const resizingRef = useRef<{ side: "left" | "right"; startX: number; startW: number } | null>(null);
+
+  // Persist panel state
+  useEffect(() => {
+    savePanelState(leftWidth, rightWidth, leftOpen, rightOpen);
+  }, [leftWidth, rightWidth, leftOpen, rightOpen]);
+
+  // Drag-resize handlers
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      const r = resizingRef.current;
+      if (!r) return;
+      const delta = e.clientX - r.startX;
+      const newW = Math.max(MIN_PANEL, Math.min(MAX_PANEL,
+        r.side === "left" ? r.startW + delta : r.startW - delta
+      ));
+      if (r.side === "left") setLeftWidth(newW);
+      else setRightWidth(newW);
+    };
+    const onUp = () => { resizingRef.current = null; document.body.style.cursor = ""; };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    return () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+  }, []);
+
+  const startResize = (side: "left" | "right", e: React.MouseEvent) => {
+    e.preventDefault();
+    const startW = side === "left" ? leftWidth : rightWidth;
+    resizingRef.current = { side, startX: e.clientX, startW };
+    document.body.style.cursor = "col-resize";
+  };
 
   const activeSheetId = useCanvasStore((s) => s.activeSheetId);
   const viewMode = useCanvasStore((s) => s.viewMode);
@@ -49,10 +106,12 @@ export function AppShell() {
   const clearSelection = useCanvasStore((s) => s.clearSelection);
 
   const project = useProjectStore((s) => s.project);
+  const isDirty = useProjectStore((s) => s.isDirty);
   const addElement = useProjectStore((s) => s.addElement);
   const addElements = useProjectStore((s) => s.addElements);
   const addLayers = useProjectStore((s) => s.addLayers);
   const setProject = useProjectStore((s) => s.setProject);
+  const resetProject = useProjectStore((s) => s.resetProject);
   const getActiveLayer = useProjectStore((s) => s.getActiveLayer);
   const undo = useProjectStore((s) => s.undo);
   const redo = useProjectStore((s) => s.redo);
@@ -80,6 +139,15 @@ export function AppShell() {
     return () => obs.disconnect();
   }, []);
 
+  // New project
+  const handleNew = useCallback(() => {
+    if (isDirty && !window.confirm("Unsaved changes will be lost. Create new project?")) return;
+    const firstSheetId = resetProject();
+    setActiveSheet(firstSheetId);
+    clearSelection();
+    setActiveTool("select");
+  }, [isDirty, resetProject, setActiveSheet, clearSelection, setActiveTool]);
+
   // Global keyboard shortcuts
   const handleGlobalKey = useCallback(
     (e: KeyboardEvent) => {
@@ -87,6 +155,7 @@ export function AppShell() {
       const inInput = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
       const ctrl = e.ctrlKey || e.metaKey;
 
+      if (ctrl && e.key === "n") { e.preventDefault(); handleNew(); }
       if (ctrl && e.key === "s") { e.preventDefault(); saveProjectToFile(project); }
       if (ctrl && e.key === "o") { e.preventDefault(); loadProjectFromFile().then(setProject).catch(() => {}); }
       if (ctrl && e.key === "p") {
@@ -123,7 +192,7 @@ export function AppShell() {
         }
       }
     },
-    [project, setProject, activeSheetId, selectedElementIds, clipboard, setClipboard, addElement, clearSelection, undo, redo]
+    [project, setProject, activeSheetId, selectedElementIds, clipboard, setClipboard, addElement, clearSelection, undo, redo, handleNew]
   );
 
   useEffect(() => {
@@ -131,7 +200,7 @@ export function AppShell() {
     return () => window.removeEventListener("keydown", handleGlobalKey);
   }, [handleGlobalKey]);
 
-  // Symbol placement confirmation
+  // Symbol placement
   const handlePlaceSymbol = useCallback(
     (attributes: Record<string, string>) => {
       if (!pendingPlacement || !activeSheetId) return;
@@ -155,7 +224,7 @@ export function AppShell() {
     [pendingPlacement, activeSheetId, getActiveLayer, project, addElement, setPendingPlacement]
   );
 
-  // Cross-sheet arrow placement
+  // Cross-sheet arrows
   const handleArrowClick = useCallback(
     (pos: Point) => {
       if (activeTool === "sourceArrow" || activeTool === "destArrow") {
@@ -203,22 +272,17 @@ export function AppShell() {
     (selectedLayerIds: Set<string>) => {
       if (!dxfImport || !activeSheetId) return;
       const { result } = dxfImport;
-
-      // Add only the selected layers (avoid duplicating names already on sheet)
       const sheet = project.sheets.find((s) => s.id === activeSheetId);
       const existingLayerNames = new Set(sheet?.layers.map((l) => l.name) ?? []);
       const newLayers = result.layers.filter(
         (l) => selectedLayerIds.has(l.id) && !existingLayerNames.has(l.name)
       );
-
-      // Remap layerIds: if a layer name already exists on the sheet, use the existing layer's id
       const nameToSheetLayerId = new Map(sheet?.layers.map((l) => [l.name, l.id]) ?? []);
       const importIdToSheetId = new Map<string, string>();
       for (const l of result.layers) {
         const existing = nameToSheetLayerId.get(l.name);
         importIdToSheetId.set(l.id, existing ?? l.id);
       }
-
       const elements = result.elements
         .filter((e) => selectedLayerIds.has(e.layerId))
         .map((e) => ({
@@ -226,7 +290,6 @@ export function AppShell() {
           sheetId: activeSheetId,
           layerId: importIdToSheetId.get(e.layerId) ?? e.layerId,
         }));
-
       if (newLayers.length > 0) addLayers(activeSheetId, newLayers);
       addElements(activeSheetId, elements);
       setDxfImport(null);
@@ -245,9 +308,13 @@ export function AppShell() {
     return rungNumberForXY(sheet, pendingPlacement.pos.x, pendingPlacement.pos.y) ?? undefined;
   })();
 
+  const effectiveLeftWidth = leftOpen ? leftWidth : 0;
+  const effectiveRightWidth = rightOpen ? rightWidth : 0;
+
   return (
     <div className="app-shell">
       <MenuBar
+        onNew={handleNew}
         onExportPDF={() => {
           const sheet = project.sheets.find((s) => s.id === activeSheetId);
           if (sheet) exportSheetToPDF(sheet);
@@ -257,10 +324,31 @@ export function AppShell() {
         onOpenSettings={() => setShowSettings(true)}
       />
       <div className="app-body">
-        <aside className="sidebar sidebar--left">
+        {/* Left sidebar */}
+        <aside
+          className="sidebar sidebar--left"
+          style={{ width: effectiveLeftWidth, overflow: effectiveLeftWidth === 0 ? "hidden" : undefined }}
+        >
           <DrawingToolbar />
           <LibraryPanel />
         </aside>
+
+        {/* Left panel toggle + resize handle */}
+        <div className="panel-edge panel-edge--left">
+          <button
+            className="panel-toggle-btn"
+            title={leftOpen ? "Hide left panel" : "Show left panel"}
+            onClick={() => setLeftOpen((v) => !v)}
+          >
+            {leftOpen ? "◀" : "▶"}
+          </button>
+          {leftOpen && (
+            <div
+              className="panel-resize-handle"
+              onMouseDown={(e) => startResize("left", e)}
+            />
+          )}
+        </div>
 
         <main className="canvas-container" ref={canvasContainerRef}>
           {viewMode === "single" && activeSheetId && (
@@ -280,7 +368,28 @@ export function AppShell() {
           )}
         </main>
 
-        <aside className="sidebar sidebar--right">
+        {/* Right panel resize handle + toggle */}
+        <div className="panel-edge panel-edge--right">
+          {rightOpen && (
+            <div
+              className="panel-resize-handle"
+              onMouseDown={(e) => startResize("right", e)}
+            />
+          )}
+          <button
+            className="panel-toggle-btn"
+            title={rightOpen ? "Hide right panel" : "Show right panel"}
+            onClick={() => setRightOpen((v) => !v)}
+          >
+            {rightOpen ? "▶" : "◀"}
+          </button>
+        </div>
+
+        {/* Right sidebar */}
+        <aside
+          className="sidebar sidebar--right"
+          style={{ width: effectiveRightWidth, overflow: effectiveRightWidth === 0 ? "hidden" : undefined }}
+        >
           <SheetNavigator />
           <LayerPanel />
           <PropertiesPanel />
@@ -296,11 +405,7 @@ export function AppShell() {
           rungNumber={pendingRungNumber}
         />
       )}
-
-      {showTitleBlockEditor && (
-        <TitleBlockEditor onClose={() => setShowTitleBlockEditor(false)} />
-      )}
-
+      {showTitleBlockEditor && <TitleBlockEditor onClose={() => setShowTitleBlockEditor(false)} />}
       {dxfImport && (
         <ImportDxfDialog
           fileName={dxfImport.fileName}
@@ -309,11 +414,7 @@ export function AppShell() {
           onCancel={() => setDxfImport(null)}
         />
       )}
-
-      {showSettings && (
-        <SettingsDialog onClose={() => setShowSettings(false)} />
-      )}
-
+      {showSettings && <SettingsDialog onClose={() => setShowSettings(false)} />}
       {arrowPendingPos && (activeTool === "sourceArrow" || activeTool === "destArrow") && (
         <CrossSheetArrowDialog
           arrowType={activeTool === "sourceArrow" ? "source" : "destination"}

@@ -34,3 +34,19 @@ export function loadProjectFromFile(): Promise<Project> {
     input.click();
   });
 }
+
+const AUTOSAVE_KEY = "ss_autosave_v1";
+
+export function autosaveProject(project: Project): void {
+  try { localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(project)); } catch {}
+}
+export function loadAutosave(): Project | null {
+  try {
+    const raw = localStorage.getItem(AUTOSAVE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as Project;
+  } catch { return null; }
+}
+export function clearAutosave(): void {
+  try { localStorage.removeItem(AUTOSAVE_KEY); } catch {}
+}
