@@ -27,6 +27,7 @@ const GeomElSchema = z.discriminatedUnion("t", [
     r: z.number(),
     large: z.union([z.literal(0), z.literal(1)]),
   }),
+  z.object({ t: z.literal("P"), pts: z.array(z.number()), closed: z.boolean() }),
 ]);
 
 const SymbolSchema = z.object({

@@ -84,6 +84,20 @@ function VectorSymbolNode({
             />
           );
         }
+        if (el.t === "P") {
+          return (
+            <Line
+              key={i}
+              points={el.pts}
+              stroke={strokeColor}
+              strokeWidth={sw}
+              closed={el.closed}
+              lineCap="round"
+              lineJoin="round"
+              listening={false}
+            />
+          );
+        }
         return null;
       })}
     </>

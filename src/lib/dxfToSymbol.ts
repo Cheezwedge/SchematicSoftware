@@ -4,41 +4,66 @@ import type { SymbolDefinition, SymbolGeomEl } from "../models/symbol";
 
 const VIEWBOX = 100;
 const PADDING = 10;
-// Konva symbol size: 60px wide/tall, centered at 0,0 → ±30 local units
 const KONVA_HALF = 30;
 const SVG_TO_KONVA = KONVA_HALF / (VIEWBOX / 2); // 0.6
 
 interface Pt { x: number; y: number }
 
+/** IQR-based bounding box — ignores outlier entities (paper space, stray blocks, etc.). */
 function buildNormalize(pts: Pt[]): { norm: (x: number, y: number) => Pt; scale: number } {
   if (pts.length === 0) return { norm: (x, y) => ({ x, y }), scale: 1 };
+
+  const xs = pts.map(p => p.x).sort((a, b) => a - b);
+  const ys = pts.map(p => p.y).sort((a, b) => a - b);
+  const q = (arr: number[], f: number) => arr[Math.min(arr.length - 1, Math.floor(arr.length * f))];
+
+  const q1x = q(xs, 0.25), q3x = q(xs, 0.75);
+  const q1y = q(ys, 0.25), q3y = q(ys, 0.75);
+  const fenceX = (q3x - q1x) * 3 || (xs[xs.length - 1] - xs[0]) || 1;
+  const fenceY = (q3y - q1y) * 3 || (ys[ys.length - 1] - ys[0]) || 1;
+
+  const core = pts.filter(p =>
+    p.x >= q1x - fenceX && p.x <= q3x + fenceX &&
+    p.y >= q1y - fenceY && p.y <= q3y + fenceY
+  );
+  const usePts = core.length >= Math.ceil(pts.length * 0.5) ? core : pts;
+
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const p of pts) {
+  for (const p of usePts) {
     if (p.x < minX) minX = p.x;
     if (p.y < minY) minY = p.y;
     if (p.x > maxX) maxX = p.x;
     if (p.y > maxY) maxY = p.y;
   }
+
   const range = Math.max(maxX - minX, maxY - minY) || 1;
-  const usable = VIEWBOX - PADDING * 2;
-  const scale = usable / range;
+  const scale = (VIEWBOX - PADDING * 2) / range;
   const cx = (minX + maxX) / 2;
   const cy = (minY + maxY) / 2;
   return {
-    norm: (x: number, y: number): Pt => ({
+    norm: (x, y): Pt => ({
       x: Math.round(((x - cx) * scale + VIEWBOX / 2) * 10) / 10,
-      y: Math.round((-(y - cy) * scale + VIEWBOX / 2) * 10) / 10, // flip Y
+      y: Math.round((-(y - cy) * scale + VIEWBOX / 2) * 10) / 10,
     }),
     scale,
   };
 }
 
-/** Convert SVG-space 0-100 coordinate to Konva local ±30 space. */
 function svgToKonva(v: number): number {
   return Math.round((v - VIEWBOX / 2) * SVG_TO_KONVA * 10) / 10;
 }
 function svgRadiusToKonva(r: number): number {
   return Math.round(r * SVG_TO_KONVA * 10) / 10;
+}
+
+/**
+ * DXF arcs travel CCW from startAngle to endAngle (math convention, Y-up).
+ * After Y-flip for SVG/Konva (Y-down), the same arc travels CW, so sweep-flag=1.
+ * large-arc-flag depends on the CCW span in DXF: if > 180° → large=1.
+ */
+function arcLargeFlag(startDeg: number, endDeg: number): 0 | 1 {
+  const ccwSpan = ((endDeg - startDeg) % 360 + 360) % 360 || 360;
+  return ccwSpan > 180 ? 1 : 0;
 }
 
 export function dxfToSymbol(content: string, fileName: string): SymbolDefinition {
@@ -61,18 +86,13 @@ export function dxfToSymbol(content: string, fileName: string): SymbolDefinition
       rawPts.push({ x: e.start.x, y: e.start.y }, { x: e.end.x, y: e.end.y });
     } else if (e.type === "LWPOLYLINE" || e.type === "POLYLINE") {
       for (const v of e.vertices ?? []) rawPts.push({ x: v.x, y: v.y });
-    } else if (e.type === "CIRCLE") {
-      rawPts.push({ x: e.center.x - e.radius, y: e.center.y - e.radius });
-      rawPts.push({ x: e.center.x + e.radius, y: e.center.y + e.radius });
-    } else if (e.type === "ARC") {
+    } else if (e.type === "CIRCLE" || e.type === "ARC") {
       rawPts.push({ x: e.center.x - e.radius, y: e.center.y - e.radius });
       rawPts.push({ x: e.center.x + e.radius, y: e.center.y + e.radius });
     }
   }
 
-  if (rawPts.length === 0) {
-    throw new Error("No drawable geometry found in DXF file.");
-  }
+  if (rawPts.length === 0) throw new Error("No drawable geometry found in DXF file.");
 
   const { norm, scale: normScale } = buildNormalize(rawPts);
   const svgParts: string[] = [];
@@ -87,16 +107,20 @@ export function dxfToSymbol(content: string, fileName: string): SymbolDefinition
 
     } else if (e.type === "LWPOLYLINE" || e.type === "POLYLINE") {
       const verts: Pt[] = (e.vertices ?? []).map((v: Pt) => norm(v.x, v.y));
-      for (let i = 0; i < verts.length - 1; i++) {
-        const a = verts[i], b = verts[i + 1];
-        svgParts.push(`<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="currentColor" stroke-width="1"/>`);
-        geometry.push({ t: "L", x1: svgToKonva(a.x), y1: svgToKonva(a.y), x2: svgToKonva(b.x), y2: svgToKonva(b.y) });
-      }
-      if (e.closed && verts.length > 1) {
-        const a = verts[verts.length - 1], b = verts[0];
-        svgParts.push(`<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="currentColor" stroke-width="1"/>`);
-        geometry.push({ t: "L", x1: svgToKonva(a.x), y1: svgToKonva(a.y), x2: svgToKonva(b.x), y2: svgToKonva(b.y) });
-      }
+      if (verts.length < 2) continue;
+      const closed: boolean = !!(e.closed || (e.type === "LWPOLYLINE" && (e.flag & 1)));
+      // SVG: polyline / polygon element for smooth joins
+      const ptsStr = verts.map(v => `${v.x},${v.y}`).join(" ");
+      svgParts.push(closed
+        ? `<polygon points="${ptsStr}" stroke="currentColor" stroke-width="1" fill="none"/>`
+        : `<polyline points="${ptsStr}" stroke="currentColor" stroke-width="1" fill="none"/>`
+      );
+      // Konva: single Line with all vertices for proper joins
+      geometry.push({
+        t: "P",
+        pts: verts.flatMap(v => [svgToKonva(v.x), svgToKonva(v.y)]),
+        closed,
+      });
 
     } else if (e.type === "CIRCLE") {
       const c = norm(e.center.x, e.center.y);
@@ -109,15 +133,14 @@ export function dxfToSymbol(content: string, fileName: string): SymbolDefinition
       const r_svg = Math.round(e.radius * normScale * 10) / 10;
       const startDeg = e.startAngle ?? 0;
       const endDeg = e.endAngle ?? 360;
+      // Negate angles because SVG/Konva Y-axis is flipped relative to DXF (Y-up)
       const startRad = (-startDeg * Math.PI) / 180;
       const endRad = (-endDeg * Math.PI) / 180;
       const x1 = Math.round((c.x + r_svg * Math.cos(startRad)) * 10) / 10;
       const y1 = Math.round((c.y + r_svg * Math.sin(startRad)) * 10) / 10;
       const x2 = Math.round((c.x + r_svg * Math.cos(endRad)) * 10) / 10;
       const y2 = Math.round((c.y + r_svg * Math.sin(endRad)) * 10) / 10;
-      let sweep = startDeg - endDeg;
-      if (sweep < 0) sweep += 360;
-      const large: 0 | 1 = sweep > 180 ? 1 : 0;
+      const large = arcLargeFlag(startDeg, endDeg);
       svgParts.push(`<path d="M${x1},${y1} A${r_svg},${r_svg} 0 ${large},1 ${x2},${y2}" stroke="currentColor" stroke-width="1" fill="none"/>`);
       geometry.push({
         t: "A",
@@ -129,9 +152,7 @@ export function dxfToSymbol(content: string, fileName: string): SymbolDefinition
     }
   }
 
-  if (svgParts.length === 0) {
-    throw new Error("No supported geometry types found (LINE, POLYLINE, CIRCLE, ARC).");
-  }
+  if (svgParts.length === 0) throw new Error("No supported geometry types found (LINE, POLYLINE, CIRCLE, ARC).");
 
   const name = fileName.replace(/\.[^.]+$/, "");
   const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VIEWBOX} ${VIEWBOX}">${svgParts.join("")}</svg>`;

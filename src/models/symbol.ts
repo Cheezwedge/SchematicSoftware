@@ -6,7 +6,8 @@ export type SymbolStandard = "IEC" | "NEMA" | "ISO1219" | "custom";
 export type SymbolGeomEl =
   | { t: "L"; x1: number; y1: number; x2: number; y2: number }
   | { t: "C"; cx: number; cy: number; r: number }
-  | { t: "A"; x1: number; y1: number; x2: number; y2: number; r: number; large: 0 | 1 };
+  | { t: "A"; x1: number; y1: number; x2: number; y2: number; r: number; large: 0 | 1 }
+  | { t: "P"; pts: number[]; closed: boolean };
 
 export interface SymbolAttributeDef {
   name: string;
