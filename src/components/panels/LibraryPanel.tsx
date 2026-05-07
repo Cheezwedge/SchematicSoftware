@@ -1,8 +1,9 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useLibraryStore } from "../../store/libraryStore";
 import { useCanvasStore } from "../../store/canvasStore";
 import { exportLibrary, importLibraryFile } from "../../lib/schlib";
 import { dxfToSymbol, loadDxfSymbolFile } from "../../lib/dxfToSymbol";
+import { dwgToSymbol, loadDwgFile } from "../../lib/dwgToSymbol";
 
 export function LibraryPanel() {
   const libraries = useLibraryStore((s) => s.libraries);
@@ -11,6 +12,7 @@ export function LibraryPanel() {
   const addSymbolToUserLibrary = useLibraryStore((s) => s.addSymbolToUserLibrary);
   const setPendingSymbol = useCanvasStore((s) => s.setPendingSymbol);
   const setActiveTool = useCanvasStore((s) => s.setActiveTool);
+  const [dwgLoading, setDwgLoading] = useState(false);
 
   const symbols = useMemo(() => {
     const all = libraries.flatMap((l) => l.symbols);
@@ -53,6 +55,16 @@ export function LibraryPanel() {
       .catch((err: Error) => alert(err.message));
   };
 
+  const handleImportDwgSymbol = () => {
+    loadDwgFile()
+      .then(({ buffer, name }) => {
+        setDwgLoading(true);
+        return dwgToSymbol(buffer, name).finally(() => setDwgLoading(false));
+      })
+      .then((sym) => addSymbolToUserLibrary(sym))
+      .catch((err: Error) => { setDwgLoading(false); alert(err.message); });
+  };
+
   const byCategory = symbols.reduce<Record<string, typeof symbols>>((acc, sym) => {
     if (!acc[sym.category]) acc[sym.category] = [];
     acc[sym.category].push(sym);
@@ -66,10 +78,18 @@ export function LibraryPanel() {
         <div className="panel-header-actions">
           <button
             className="icon-btn"
-            title="Import DXF/DWG as new symbol"
+            title="Import DXF file as new symbol (geometry → library)"
             onClick={handleImportDxfSymbol}
           >
             DXF
+          </button>
+          <button
+            className="icon-btn"
+            title="Import DWG file as new symbol (AutoCAD binary → library)"
+            onClick={handleImportDwgSymbol}
+            disabled={dwgLoading}
+          >
+            {dwgLoading ? "…" : "DWG"}
           </button>
           <button
             className="icon-btn"
