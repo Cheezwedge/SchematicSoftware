@@ -582,7 +582,7 @@ export function MultiSheetCanvas({ containerWidth, containerHeight, onArrowClick
                     <Line
                       points={flatPts(wire.points)}
                       stroke={displayColor}
-                      strokeWidth={isSelected ? 3 : 1.5}
+                      strokeWidth={isSelected ? 2 / viewport.scale : 1.5 / viewport.scale}
                       hitStrokeWidth={10}
                       lineCap="round"
                       lineJoin="round"

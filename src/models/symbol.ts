@@ -2,6 +2,12 @@ import type { Direction } from "./geometry";
 
 export type SymbolStandard = "IEC" | "NEMA" | "ISO1219" | "custom";
 
+/** Structured geometry stored in Konva local coordinates (±30 px, centered at 0,0). */
+export type SymbolGeomEl =
+  | { t: "L"; x1: number; y1: number; x2: number; y2: number }
+  | { t: "C"; cx: number; cy: number; r: number }
+  | { t: "A"; x1: number; y1: number; x2: number; y2: number; r: number; large: 0 | 1 };
+
 export interface SymbolAttributeDef {
   name: string;
   label: string;
@@ -32,6 +38,8 @@ export interface SymbolDefinition {
   connectionPoints: ConnectionPoint[];
   attributes: SymbolAttributeDef[];
   tags: string[];
+  /** Present on imported symbols; enables zoom-independent vector rendering. */
+  geometry?: SymbolGeomEl[];
 }
 
 export interface SymbolInstance {

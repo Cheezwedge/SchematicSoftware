@@ -38,6 +38,7 @@ export function WireLayer({ sheet, previewPoints, isDrawingWire }: Props) {
   const selectedIds = useCanvasStore((s) => s.selectedElementIds);
   const setSelection = useCanvasStore((s) => s.setSelection);
   const activeTool = useCanvasStore((s) => s.activeTool);
+  const scale = useCanvasStore((s) => s.viewport.scale);
   const updateElement = useProjectStore((s) => s.updateElement);
   const gridSize = useProjectStore((s) => s.project.settings.gridSize);
   const wireLabelSize = useProjectStore((s) => s.project.settings.wireLabelSize);
@@ -72,7 +73,7 @@ export function WireLayer({ sheet, previewPoints, isDrawingWire }: Props) {
             <Line
               points={flat}
               stroke={resolveWireColor(wire.color, isDark)}
-              strokeWidth={isSelected ? 3 : 1.5}
+              strokeWidth={isSelected ? 2 / scale : 1.5 / scale}
               hitStrokeWidth={10}
               onClick={() => setSelection([wire.id])}
               draggable={isDraggable}
@@ -100,7 +101,7 @@ export function WireLayer({ sheet, previewPoints, isDrawingWire }: Props) {
           <Line
             points={previewPoints}
             stroke="#0066cc"
-            strokeWidth={1.5}
+            strokeWidth={1.5 / scale}
             dash={[4, 3]}
             listening={false}
           />

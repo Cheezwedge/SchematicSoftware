@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { Layer, Group, Image as KonvaImage, Text, Circle } from "react-konva";
+import { Layer, Group, Image as KonvaImage, Text, Circle, Line, Path, Rect } from "react-konva";
 import type Konva from "konva";
-import type { SymbolInstance } from "../models/symbol";
+import type { SymbolInstance, SymbolGeomEl } from "../models/symbol";
 import type { Sheet } from "../models/sheet";
 import { useCanvasStore } from "../store/canvasStore";
 import { useLibraryStore } from "../store/libraryStore";
@@ -29,6 +29,67 @@ function useSvgImage(svgContent: string, color: string): HTMLImageElement | null
   return img;
 }
 
+/** Renders imported symbols as Konva vector primitives with zoom-independent strokeWidth. */
+function VectorSymbolNode({
+  geometry,
+  strokeColor,
+  viewportScale,
+  instanceScale,
+}: {
+  geometry: SymbolGeomEl[];
+  strokeColor: string;
+  viewportScale: number;
+  instanceScale: number;
+}) {
+  const sw = 1.5 / (viewportScale * instanceScale);
+  return (
+    <>
+      {geometry.map((el, i) => {
+        if (el.t === "L") {
+          return (
+            <Line
+              key={i}
+              points={[el.x1, el.y1, el.x2, el.y2]}
+              stroke={strokeColor}
+              strokeWidth={sw}
+              lineCap="round"
+              listening={false}
+            />
+          );
+        }
+        if (el.t === "C") {
+          return (
+            <Circle
+              key={i}
+              x={el.cx}
+              y={el.cy}
+              radius={el.r}
+              stroke={strokeColor}
+              strokeWidth={sw}
+              fill="transparent"
+              listening={false}
+            />
+          );
+        }
+        if (el.t === "A") {
+          const d = `M${el.x1},${el.y1} A${el.r},${el.r} 0 ${el.large},1 ${el.x2},${el.y2}`;
+          return (
+            <Path
+              key={i}
+              data={d}
+              stroke={strokeColor}
+              strokeWidth={sw}
+              fill="transparent"
+              listening={false}
+            />
+          );
+        }
+        return null;
+      })}
+    </>
+  );
+}
+
 interface SymbolNodeProps {
   instance: SymbolInstance;
   isSelected: boolean;
@@ -46,11 +107,14 @@ export function SymbolNode({ instance, isSelected, onSelect, showConnectionPoint
   );
   const theme = useThemeStore((s) => s.theme);
   const effectiveColor = symbolColor ?? (theme === "dark" ? "#cccccc" : "#000000");
-  const img = useSvgImage(def?.svgContent ?? "", effectiveColor);
+  const img = useSvgImage(def?.geometry ? "" : (def?.svgContent ?? ""), effectiveColor);
+  const viewportScale = useCanvasStore((s) => s.viewport.scale);
   const updateElement = useProjectStore((s) => s.updateElement);
   const deviceLabelSize = useProjectStore((s) => s.project.settings.deviceLabelSize);
 
-  if (!def || !img) return null;
+  if (!def) return null;
+  // For vector symbols, skip the rasterized image. For SVG symbols, wait for image load.
+  if (!def.geometry && !img) return null;
 
   const half = SYMBOL_SIZE / 2;
   const effectiveCPs = getEffectiveConnectionPoints(def);
@@ -75,15 +139,41 @@ export function SymbolNode({ instance, isSelected, onSelect, showConnectionPoint
       onDragEnd={handleDragEnd}
       listening={true}
     >
-      <KonvaImage
-        image={img}
-        x={-half}
-        y={-half}
-        width={SYMBOL_SIZE}
-        height={SYMBOL_SIZE}
-        stroke={isSelected ? "#0066cc" : undefined}
-        strokeWidth={isSelected ? 2 : 0}
-      />
+      {def.geometry ? (
+        <>
+          {/* Transparent hit rect so click/drag still works */}
+          <Rect x={-half} y={-half} width={SYMBOL_SIZE} height={SYMBOL_SIZE} opacity={0} />
+          {isSelected && (
+            <Rect
+              x={-half}
+              y={-half}
+              width={SYMBOL_SIZE}
+              height={SYMBOL_SIZE}
+              stroke="#0066cc"
+              strokeWidth={1.5 / (viewportScale * instance.scale)}
+              fill="transparent"
+              listening={false}
+              dash={[4 / (viewportScale * instance.scale), 3 / (viewportScale * instance.scale)]}
+            />
+          )}
+          <VectorSymbolNode
+            geometry={def.geometry}
+            strokeColor={effectiveColor}
+            viewportScale={viewportScale}
+            instanceScale={instance.scale}
+          />
+        </>
+      ) : (
+        <KonvaImage
+          image={img!}
+          x={-half}
+          y={-half}
+          width={SYMBOL_SIZE}
+          height={SYMBOL_SIZE}
+          stroke={isSelected ? "#0066cc" : undefined}
+          strokeWidth={isSelected ? 2 : 0}
+        />
+      )}
       {instance.attributes.tag && (
         <Text
           x={-half}
