@@ -1,5 +1,6 @@
-import { Fragment } from "react";
+import type { } from "react";
 import { Layer, Text, Path, Group, Rect, Line, Shape } from "react-konva";
+import type Konva from "konva";
 import { useThemeStore } from "../store/themeStore";
 import type { Sheet } from "../models/sheet";
 import type { RevisionCloud } from "../models/revision";
@@ -10,10 +11,43 @@ import { useCanvasStore } from "../store/canvasStore";
 import { generateRevisionCloudPath } from "../lib/revisionCloud";
 import { HEX_W, HEX_H, HEX_NOTCH } from "../lib/constants";
 import { BUILTIN_TEMPLATE_ID, DEFAULT_TITLE_BLOCK_FIELDS } from "../models/titleBlock";
+import { snapToGrid } from "./routing/orthogonalRouter";
 
-export function HexRungBadge({ x, y, label, isDark }: { x: number; y: number; label: string; isDark: boolean }) {
+interface HexRungBadgeProps {
+  x: number;
+  y: number;
+  label: string;
+  isDark: boolean;
+  isSelected?: boolean;
+  draggable?: boolean;
+  onClick?: (e: Konva.KonvaEventObject<MouseEvent>) => void;
+  onDragEnd?: (e: Konva.KonvaEventObject<DragEvent>) => void;
+}
+
+export function HexRungBadge({ x, y, label, isDark, isSelected, draggable, onClick, onDragEnd }: HexRungBadgeProps) {
+  const interactive = !!onClick;
   return (
-    <Group x={x} y={y} listening={false}>
+    <Group
+      x={x}
+      y={y}
+      listening={interactive}
+      draggable={draggable}
+      onClick={onClick}
+      onDragEnd={onDragEnd}
+    >
+      {isSelected && (
+        <Rect
+          x={-HEX_W / 2 - 3}
+          y={-HEX_H / 2 - 3}
+          width={HEX_W + 6}
+          height={HEX_H + 6}
+          stroke="#0066cc"
+          strokeWidth={1.5}
+          fill="rgba(0,102,204,0.08)"
+          dash={[4, 2]}
+          listening={false}
+        />
+      )}
       <Shape
         sceneFunc={(ctx, shape) => {
           const w = HEX_W / 2;
@@ -30,8 +64,8 @@ export function HexRungBadge({ x, y, label, isDark }: { x: number; y: number; la
           ctx.fillStrokeShape(shape);
         }}
         fill={isDark ? "#1a1a3a" : "#eaeaff"}
-        stroke={isDark ? "#6666cc" : "#3333aa"}
-        strokeWidth={1.2}
+        stroke={isSelected ? "#0066cc" : isDark ? "#6666cc" : "#3333aa"}
+        strokeWidth={isSelected ? 2 : 1.2}
       />
       <Text
         x={-HEX_W / 2}
@@ -127,21 +161,16 @@ function TitleBlockRenderer({ sheet, W, H }: { sheet: Sheet; W: number; H: numbe
 
   const tbY = H - TB_H;
 
-  // Column break x-coords (proportions of W)
-  const c1 = W * 0.50; // project / title column end
-  const c2 = W * 0.72; // drawn/checked column end
-  const c3 = W * 0.84; // rev/date column end
-  // c3 → W: sheet number
+  const c1 = W * 0.50;
+  const c2 = W * 0.72;
+  const c3 = W * 0.84;
 
   const row1Y = ROW0_H;
   const row2Y = ROW0_H + ROW1_H;
 
   return (
     <Group x={0} y={tbY} listening={false}>
-      {/* Background */}
       <Rect x={0} y={0} width={W} height={TB_H} fill="white" stroke={STROKE} strokeWidth={SW} />
-
-      {/* Row 0 — Company */}
       <Line points={[0, row1Y, W, row1Y]} stroke={STROKE} strokeWidth={SW} />
       <Text
         x={0} y={PAD}
@@ -152,39 +181,22 @@ function TitleBlockRenderer({ sheet, W, H }: { sheet: Sheet; W: number; H: numbe
         fill={val("company") ? VALUE_COLOR : "#bbbbbb"}
         listening={false}
       />
-
-      {/* Row 1 — Project | Drawn By | Rev | Sheet */}
       <Line points={[0, row2Y, W, row2Y]} stroke={STROKE} strokeWidth={SW} />
       <Line points={[c1, row1Y, c1, TB_H]} stroke={STROKE} strokeWidth={SW} />
       <Line points={[c2, row1Y, c2, TB_H]} stroke={STROKE} strokeWidth={SW} />
       <Line points={[c3, row1Y, c3, TB_H]} stroke={STROKE} strokeWidth={SW} />
-
-      {/* Project Name */}
       <Text x={PAD} y={row1Y + PAD} text="Project" fontSize={LABEL_FS} fill={LABEL_COLOR} />
       <Text x={PAD} y={row1Y + PAD + LABEL_FS + 1} text={val("projectName")} fontSize={VALUE_FS} fill={VALUE_COLOR} width={c1 - PAD * 2} ellipsis />
-
-      {/* Drawn By */}
       <Text x={c1 + PAD} y={row1Y + PAD} text="Drawn By" fontSize={LABEL_FS} fill={LABEL_COLOR} />
       <Text x={c1 + PAD} y={row1Y + PAD + LABEL_FS + 1} text={val("drawnBy")} fontSize={VALUE_FS} fill={VALUE_COLOR} width={c2 - c1 - PAD * 2} ellipsis />
-
-      {/* Rev */}
       <Text x={c2 + PAD} y={row1Y + PAD} text="Rev" fontSize={LABEL_FS} fill={LABEL_COLOR} />
       <Text x={c2 + PAD} y={row1Y + PAD + LABEL_FS + 1} text={val("revision")} fontSize={VALUE_FS} fill={VALUE_COLOR} />
-
-      {/* Sheet No. — spans both data rows */}
       <Text x={c3 + PAD} y={row1Y + PAD} text="Sheet No." fontSize={LABEL_FS} fill={LABEL_COLOR} />
       <Text x={c3 + PAD} y={row1Y + PAD + LABEL_FS + 1} text={val("sheetNumber")} fontSize={VALUE_FS + 1} fontStyle="bold" fill={VALUE_COLOR} />
-
-      {/* Row 2 — Title | Checked By | Date */}
-      {/* Title */}
       <Text x={PAD} y={row2Y + PAD} text="Title" fontSize={LABEL_FS} fill={LABEL_COLOR} />
       <Text x={PAD} y={row2Y + PAD + LABEL_FS + 1} text={val("title")} fontSize={VALUE_FS} fill={VALUE_COLOR} width={c1 - PAD * 2} ellipsis />
-
-      {/* Checked By */}
       <Text x={c1 + PAD} y={row2Y + PAD} text="Checked By" fontSize={LABEL_FS} fill={LABEL_COLOR} />
       <Text x={c1 + PAD} y={row2Y + PAD + LABEL_FS + 1} text={val("checkedBy")} fontSize={VALUE_FS} fill={VALUE_COLOR} width={c2 - c1 - PAD * 2} ellipsis />
-
-      {/* Date */}
       <Text x={c2 + PAD} y={row2Y + PAD} text="Date" fontSize={LABEL_FS} fill={LABEL_COLOR} />
       <Text x={c2 + PAD} y={row2Y + PAD + LABEL_FS + 1} text={val("date")} fontSize={VALUE_FS} fill={VALUE_COLOR} width={c3 - c2 - PAD * 2} />
     </Group>
@@ -193,7 +205,12 @@ function TitleBlockRenderer({ sheet, W, H }: { sheet: Sheet; W: number; H: numbe
 
 export function AnnotationLayer({ sheet, canvasWidth, canvasHeight }: Props) {
   const setActiveSheet = useCanvasStore((s) => s.setActiveSheet);
+  const selectedElementIds = useCanvasStore((s) => s.selectedElementIds);
+  const setSelection = useCanvasStore((s) => s.setSelection);
+  const addToSelection = useCanvasStore((s) => s.addToSelection);
   const sheets = useProjectStore((s) => s.project.sheets);
+  const updateElement = useProjectStore((s) => s.updateElement);
+  const gridSize = useProjectStore((s) => s.project.settings.gridSize);
   const theme = useThemeStore((s) => s.theme);
   const isDark = theme === "dark";
 
@@ -211,7 +228,7 @@ export function AnnotationLayer({ sheet, canvasWidth, canvasHeight }: Props) {
 
   return (
     <Layer>
-      {/* Rung hexagonal badges */}
+      {/* Rung hexagonal badges — selectable and draggable */}
       {rungMarkers.map((rm) => (
         <HexRungBadge
           key={rm.id}
@@ -219,23 +236,84 @@ export function AnnotationLayer({ sheet, canvasWidth, canvasHeight }: Props) {
           y={rm.y}
           label={String(rm.number)}
           isDark={isDark}
+          isSelected={selectedElementIds.has(rm.id)}
+          draggable
+          onClick={(e) => {
+            if (e.evt.ctrlKey || e.evt.metaKey || e.evt.shiftKey) {
+              addToSelection(rm.id);
+            } else {
+              setSelection([rm.id]);
+            }
+          }}
+          onDragEnd={(e) => {
+            const x = snapToGrid(e.target.x(), gridSize);
+            const y = snapToGrid(e.target.y(), gridSize);
+            e.target.x(x);
+            e.target.y(y);
+            updateElement(sheet.id, rm.id, { x, y });
+          }}
         />
       ))}
 
-      {/* Revision clouds */}
+      {/* Revision clouds — selectable and draggable */}
       {revClouds.map((cloud) => {
         const layer = layerMap.get(cloud.layerId);
         if (layer && !layer.visible) return null;
         const path = generateRevisionCloudPath(cloud.points, cloud.arcRadius);
+        const isSelected = selectedElementIds.has(cloud.id);
+
+        const xs = cloud.points.map((p) => p.x);
+        const ys = cloud.points.map((p) => p.y);
+        const bMinX = Math.min(...xs);
+        const bMinY = Math.min(...ys);
+        const bMaxX = Math.max(...xs);
+        const bMaxY = Math.max(...ys);
+
         return (
-          <Fragment key={cloud.id}>
+          <Group
+            key={cloud.id}
+            x={0}
+            y={0}
+            draggable
+            onClick={(e) => {
+              e.cancelBubble = true;
+              if (e.evt.ctrlKey || e.evt.metaKey || e.evt.shiftKey) {
+                addToSelection(cloud.id);
+              } else {
+                setSelection([cloud.id]);
+              }
+            }}
+            onDragEnd={(e) => {
+              const dx = snapToGrid(e.target.x(), gridSize);
+              const dy = snapToGrid(e.target.y(), gridSize);
+              e.target.x(0);
+              e.target.y(0);
+              if (dx === 0 && dy === 0) return;
+              updateElement(sheet.id, cloud.id, {
+                points: cloud.points.map((p) => ({ x: p.x + dx, y: p.y + dy })),
+              });
+            }}
+          >
+            {isSelected && (
+              <Rect
+                x={bMinX - 4}
+                y={bMinY - 4}
+                width={bMaxX - bMinX + 8}
+                height={bMaxY - bMinY + 8}
+                stroke="#0066cc"
+                strokeWidth={1.5}
+                fill="rgba(0,102,204,0.05)"
+                dash={[5, 3]}
+                listening={false}
+              />
+            )}
             <Path
               data={path}
               stroke="#ff6600"
               strokeWidth={1.5}
               fill="rgba(255, 102, 0, 0.08)"
               dash={[4, 2]}
-              listening={false}
+              hitStrokeWidth={8}
             />
             <Text
               x={cloud.points[0]?.x ?? 0}
@@ -246,7 +324,7 @@ export function AnnotationLayer({ sheet, canvasWidth, canvasHeight }: Props) {
               fontStyle="bold"
               listening={false}
             />
-          </Fragment>
+          </Group>
         );
       })}
 

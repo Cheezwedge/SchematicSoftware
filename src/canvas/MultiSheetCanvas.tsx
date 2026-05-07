@@ -22,7 +22,7 @@ import type { RungMarker } from "../models/rungMarker";
 import type { Sheet } from "../models/sheet";
 import { HexRungBadge } from "./AnnotationLayer";
 import { useRungMarkerTool } from "./hooks/useRungMarkerTool";
-import { PIXELS_PER_MM as _PPM } from "../lib/constants";
+import { PIXELS_PER_MM as _PPM, HEX_W, HEX_H } from "../lib/constants";
 
 function isHexDark(hex: string): boolean {
   const r = parseInt(hex.slice(1, 3), 16) || 0;
@@ -78,6 +78,7 @@ export function MultiSheetCanvas({ containerWidth, containerHeight, onArrowClick
   const setActiveLayer = useCanvasStore((s) => s.setActiveLayer);
   const selectedElementIds = useCanvasStore((s) => s.selectedElementIds);
   const setSelection = useCanvasStore((s) => s.setSelection);
+  const addToSelection = useCanvasStore((s) => s.addToSelection);
   const clearSelection = useCanvasStore((s) => s.clearSelection);
   const rotatePendingSymbol = useCanvasStore((s) => s.rotatePendingSymbol);
   const setActiveTool = useCanvasStore((s) => s.setActiveTool);
@@ -296,6 +297,28 @@ export function MultiSheetCanvas({ containerWidth, containerHeight, onArrowClick
                 ? wx + SYMBOL_HALF >= minX && wx - SYMBOL_HALF <= maxX &&
                   sym.y + SYMBOL_HALF >= minY && sym.y - SYMBOL_HALF <= maxY
                 : inside(wx, sym.y);
+              if (hit) ids.push(el.id);
+            } else if (el.type === "revisionCloud") {
+              const cloud = el as RevisionCloud;
+              if (cloud.points.length > 0) {
+                const cMinX = Math.min(...cloud.points.map((p) => p.x)) + sx;
+                const cMaxX = Math.max(...cloud.points.map((p) => p.x)) + sx;
+                const cMinY = Math.min(...cloud.points.map((p) => p.y));
+                const cMaxY = Math.max(...cloud.points.map((p) => p.y));
+                const hit = isCrossing
+                  ? cMinX <= maxX && cMaxX >= minX && cMinY <= maxY && cMaxY >= minY
+                  : cMinX >= minX && cMaxX <= maxX && cMinY >= minY && cMaxY <= maxY;
+                if (hit) ids.push(el.id);
+              }
+            } else if (el.type === "rungMarker") {
+              const rm = el as RungMarker;
+              const bx1 = rm.x + sx - HEX_W / 2;
+              const bx2 = rm.x + sx + HEX_W / 2;
+              const by1 = rm.y - HEX_H / 2;
+              const by2 = rm.y + HEX_H / 2;
+              const hit = isCrossing
+                ? bx1 <= maxX && bx2 >= minX && by1 <= maxY && by2 >= minY
+                : bx1 >= minX && bx2 <= maxX && by1 >= minY && by2 <= maxY;
               if (hit) ids.push(el.id);
             }
           }
@@ -608,23 +631,66 @@ export function MultiSheetCanvas({ containerWidth, containerHeight, onArrowClick
                 );
               })}
 
-              {/* Revision clouds */}
+              {/* Revision clouds — selectable and draggable */}
               {clouds.map((cloud) => {
                 const lyr = layerMap.get(cloud.layerId);
                 if (lyr && !lyr.visible) return null;
                 const d = generateRevisionCloudPath(cloud.points, cloud.arcRadius);
+                const isSelected = selectedElementIds.has(cloud.id);
+                const xs = cloud.points.map((p) => p.x);
+                const ys = cloud.points.map((p) => p.y);
+                const bMinX = xs.length ? Math.min(...xs) : 0;
+                const bMinY = ys.length ? Math.min(...ys) : 0;
+                const bMaxX = xs.length ? Math.max(...xs) : 0;
+                const bMaxY = ys.length ? Math.max(...ys) : 0;
                 return (
-                  <Fragment key={cloud.id}>
+                  <Group
+                    key={cloud.id}
+                    x={0}
+                    y={0}
+                    draggable
+                    onClick={(e) => {
+                      e.cancelBubble = true;
+                      if (e.evt.ctrlKey || e.evt.metaKey || e.evt.shiftKey) {
+                        addToSelection(cloud.id);
+                      } else {
+                        setSelection([cloud.id]);
+                      }
+                    }}
+                    onDragEnd={(e) => {
+                      const dx = snapToGrid(e.target.x(), gridSize);
+                      const dy = snapToGrid(e.target.y(), gridSize);
+                      e.target.x(0);
+                      e.target.y(0);
+                      if (dx === 0 && dy === 0) return;
+                      updateElement(sheet.id, cloud.id, {
+                        points: cloud.points.map((p) => ({ x: p.x + dx, y: p.y + dy })),
+                      });
+                    }}
+                  >
+                    {isSelected && (
+                      <Rect
+                        x={bMinX - 4}
+                        y={bMinY - 4}
+                        width={bMaxX - bMinX + 8}
+                        height={bMaxY - bMinY + 8}
+                        stroke="#0066cc"
+                        strokeWidth={1.5}
+                        fill="rgba(0,102,204,0.05)"
+                        dash={[5, 3]}
+                        listening={false}
+                      />
+                    )}
                     <Path
                       data={d}
                       stroke="#cc6600"
                       strokeWidth={1.5}
                       fill="rgba(255,160,0,0.08)"
-                      listening={false}
+                      hitStrokeWidth={8}
                     />
                     {cloud.label && (
                       <Text
-                        x={(cloud.points[0]?.x ?? 0)}
+                        x={cloud.points[0]?.x ?? 0}
                         y={(cloud.points[0]?.y ?? 0) - 14}
                         text={cloud.label}
                         fontSize={9}
@@ -633,7 +699,7 @@ export function MultiSheetCanvas({ containerWidth, containerHeight, onArrowClick
                         listening={false}
                       />
                     )}
-                  </Fragment>
+                  </Group>
                 );
               })}
 
@@ -673,7 +739,7 @@ export function MultiSheetCanvas({ containerWidth, containerHeight, onArrowClick
                 );
               })}
 
-              {/* Rung marker badges */}
+              {/* Rung marker badges — selectable and draggable */}
               {sheet.elements
                 .filter((el): el is RungMarker => el.type === "rungMarker")
                 .map((rm) => (
@@ -683,6 +749,23 @@ export function MultiSheetCanvas({ containerWidth, containerHeight, onArrowClick
                     y={rm.y}
                     label={String(rm.number)}
                     isDark={theme === "dark"}
+                    isSelected={selectedElementIds.has(rm.id)}
+                    draggable
+                    onClick={(e) => {
+                      e.cancelBubble = true;
+                      if (e.evt.ctrlKey || e.evt.metaKey || e.evt.shiftKey) {
+                        addToSelection(rm.id);
+                      } else {
+                        setSelection([rm.id]);
+                      }
+                    }}
+                    onDragEnd={(e) => {
+                      const x = snapToGrid(e.target.x(), gridSize);
+                      const y = snapToGrid(e.target.y(), gridSize);
+                      e.target.x(x);
+                      e.target.y(y);
+                      updateElement(sheet.id, rm.id, { x, y });
+                    }}
                   />
                 ))}
 

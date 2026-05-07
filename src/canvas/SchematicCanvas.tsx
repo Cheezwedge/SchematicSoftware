@@ -17,7 +17,9 @@ import { stageRegistry } from "./stageRef";
 import type { Point } from "../models/geometry";
 import type { Wire } from "../models/wire";
 import type { SymbolInstance } from "../models/symbol";
-import { PIXELS_PER_MM } from "../lib/constants";
+import type { RevisionCloud } from "../models/revision";
+import type { RungMarker } from "../models/rungMarker";
+import { PIXELS_PER_MM, HEX_W, HEX_H } from "../lib/constants";
 
 const SYMBOL_HALF = 30;
 const MIN_SCALE = 0.1;
@@ -179,6 +181,28 @@ export function SchematicCanvas({ sheetId, containerWidth, containerHeight, onAr
               ? sym.x + SYMBOL_HALF >= minX && sym.x - SYMBOL_HALF <= maxX &&
                 sym.y + SYMBOL_HALF >= minY && sym.y - SYMBOL_HALF <= maxY
               : inside(sym.x, sym.y);
+            if (hit) ids.push(el.id);
+          } else if (el.type === "revisionCloud") {
+            const cloud = el as RevisionCloud;
+            if (cloud.points.length > 0) {
+              const cMinX = Math.min(...cloud.points.map((p) => p.x));
+              const cMaxX = Math.max(...cloud.points.map((p) => p.x));
+              const cMinY = Math.min(...cloud.points.map((p) => p.y));
+              const cMaxY = Math.max(...cloud.points.map((p) => p.y));
+              const hit = isCrossing
+                ? cMinX <= maxX && cMaxX >= minX && cMinY <= maxY && cMaxY >= minY
+                : cMinX >= minX && cMaxX <= maxX && cMinY >= minY && cMaxY <= maxY;
+              if (hit) ids.push(el.id);
+            }
+          } else if (el.type === "rungMarker") {
+            const rm = el as RungMarker;
+            const bx1 = rm.x - HEX_W / 2;
+            const bx2 = rm.x + HEX_W / 2;
+            const by1 = rm.y - HEX_H / 2;
+            const by2 = rm.y + HEX_H / 2;
+            const hit = isCrossing
+              ? bx1 <= maxX && bx2 >= minX && by1 <= maxY && by2 >= minY
+              : bx1 >= minX && bx2 <= maxX && by1 >= minY && by2 <= maxY;
             if (hit) ids.push(el.id);
           }
         }

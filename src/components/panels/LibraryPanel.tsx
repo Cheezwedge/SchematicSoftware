@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useLibraryStore } from "../../store/libraryStore";
 import { useCanvasStore } from "../../store/canvasStore";
 import { exportLibrary, importLibraryFile } from "../../lib/schlib";
+import { dxfToSymbol, loadDxfSymbolFile } from "../../lib/dxfToSymbol";
 
 export function LibraryPanel() {
   const libraries = useLibraryStore((s) => s.libraries);
@@ -43,6 +44,15 @@ export function LibraryPanel() {
       .catch((err: Error) => alert(err.message));
   };
 
+  const handleImportDxfSymbol = () => {
+    loadDxfSymbolFile()
+      .then(({ content, name }) => {
+        const sym = dxfToSymbol(content, name);
+        addSymbolToUserLibrary(sym);
+      })
+      .catch((err: Error) => alert(err.message));
+  };
+
   const byCategory = symbols.reduce<Record<string, typeof symbols>>((acc, sym) => {
     if (!acc[sym.category]) acc[sym.category] = [];
     acc[sym.category].push(sym);
@@ -54,6 +64,13 @@ export function LibraryPanel() {
       <div className="panel-header">
         <span>Symbols</span>
         <div className="panel-header-actions">
+          <button
+            className="icon-btn"
+            title="Import DXF/DWG as new symbol"
+            onClick={handleImportDxfSymbol}
+          >
+            DXF
+          </button>
           <button
             className="icon-btn"
             title="Import symbols from .schlib file"
