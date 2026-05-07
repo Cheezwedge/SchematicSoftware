@@ -65,9 +65,16 @@ export function useWireTool(sheetId: string) {
 
         const midX = (startPoint.x + pos.x) / 2;
         const midY = (startPoint.y + pos.y) / 2;
-        const number =
-          rungNumberForXY(sheet!, midX, midY) ??
-          nextWireNumber(existingNumbers, settings.wireNumberFormat);
+        const baseRung = rungNumberForXY(sheet!, midX, midY);
+        let number: string;
+        if (settings.wireRungSuffix && baseRung) {
+          const siblings = existingNumbers.filter(
+            (n) => n === baseRung || n.startsWith(baseRung + "-")
+          ).length;
+          number = `${baseRung}-${siblings + 1}`;
+        } else {
+          number = baseRung ?? nextWireNumber(existingNumbers, settings.wireNumberFormat);
+        }
 
         const wire: Wire = {
           id: uuidv4(),

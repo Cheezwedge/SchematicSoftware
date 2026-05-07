@@ -22,6 +22,7 @@ export interface ProjectSettings {
   invertZoom: boolean;
   wireLabelSize: number;
   deviceLabelSize: number;
+  wireRungSuffix: boolean;
 }
 
 export interface SymbolLibrary {
@@ -67,4 +68,5 @@ export const DEFAULT_PROJECT_SETTINGS: ProjectSettings = {
   invertZoom: false,
   wireLabelSize: 8,
   deviceLabelSize: 8,
+  wireRungSuffix: false,
 };

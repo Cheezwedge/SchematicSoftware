@@ -285,7 +285,9 @@ export function MultiSheetCanvas({ containerWidth, containerHeight, onArrowClick
               const wire = el as Wire;
               const hit = isCrossing
                 ? wire.points.some((p) => inside(p.x + sx, p.y))
-                : wire.points.every((p) => inside(p.x + sx, p.y));
+                : wire.points.length > 0 &&
+                  inside(wire.points[0].x + sx, wire.points[0].y) &&
+                  inside(wire.points[wire.points.length - 1].x + sx, wire.points[wire.points.length - 1].y);
               if (hit) ids.push(el.id);
             } else if (el.type === "symbol") {
               const sym = el as SymbolInstance;

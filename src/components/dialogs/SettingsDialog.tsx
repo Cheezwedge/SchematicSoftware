@@ -149,6 +149,14 @@ export function SettingsDialog({ onClose }: Props) {
           <section className="settings-section">
             <h3 className="settings-section-title">Wire Numbering</h3>
             <label className="settings-row">
+              <span>Rung suffix (-1, -2…)</span>
+              <input
+                type="checkbox"
+                checked={local.wireRungSuffix ?? false}
+                onChange={(e) => set("wireRungSuffix", e.target.checked)}
+              />
+            </label>
+            <label className="settings-row">
               <span>Prefix</span>
               <input
                 type="text"

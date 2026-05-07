@@ -202,9 +202,42 @@ html, body, #root {
 .drawing-toolbar {
   display: flex;
   flex-direction: column;
-  padding: 6px;
-  gap: 4px;
+  padding: 6px 4px;
+  gap: 0;
   border-bottom: 1px solid var(--border);
+  overflow-y: auto;
+}
+
+.tb-section {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 4px 2px 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tb-section:last-child {
+  border-bottom: none;
+}
+
+.tb-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.tb-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 34px);
+  gap: 3px;
+}
+
+.toolbar-divider {
+  display: none;
 }
 
 .tool-btn {

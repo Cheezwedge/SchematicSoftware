@@ -169,7 +169,9 @@ export function SchematicCanvas({ sheetId, containerWidth, containerHeight, onAr
             const wire = el as Wire;
             const hit = isCrossing
               ? wire.points.some((p) => inside(p.x, p.y))
-              : wire.points.every((p) => inside(p.x, p.y));
+              : wire.points.length > 0 &&
+                inside(wire.points[0].x, wire.points[0].y) &&
+                inside(wire.points[wire.points.length - 1].x, wire.points[wire.points.length - 1].y);
             if (hit) ids.push(el.id);
           } else if (el.type === "symbol") {
             const sym = el as SymbolInstance;
