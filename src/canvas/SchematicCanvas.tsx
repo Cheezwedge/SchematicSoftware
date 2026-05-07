@@ -51,6 +51,10 @@ export function SchematicCanvas({ sheetId, containerWidth, containerHeight, onAr
   const updateSettings = useProjectStore((s) => s.updateSettings);
   const invertZoom = useProjectStore((s) => s.project.settings.invertZoom);
 
+  // Middle mouse pan state
+  const panStartRef = useRef<{ px: number; py: number; vx: number; vy: number } | null>(null);
+  const [isPanning, setIsPanning] = useState(false);
+
   // Rubber-band selection state (in canvas/sheet coordinates)
   const [bandStart, setBandStart] = useState<Point | null>(null);
   const [bandCurrent, setBandCurrent] = useState<Point | null>(null);
@@ -127,6 +131,17 @@ export function SchematicCanvas({ sheetId, containerWidth, containerHeight, onAr
 
   const handleMouseDown = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
+      // Middle mouse → start panning, skip all tool actions
+      if (e.evt.button === 1) {
+        e.evt.preventDefault?.();
+        const stage = stageRef.current;
+        if (!stage) return;
+        const sp = stage.getPointerPosition() ?? { x: 0, y: 0 };
+        panStartRef.current = { px: sp.x, py: sp.y, vx: viewport.x, vy: viewport.y };
+        setIsPanning(true);
+        return;
+      }
+
       wireMouseDown(e);
       rungMouseDown(e);
 
@@ -141,11 +156,17 @@ export function SchematicCanvas({ sheetId, containerWidth, containerHeight, onAr
         }
       }
     },
-    [activeTool, wireMouseDown, rungMouseDown]
+    [activeTool, wireMouseDown, rungMouseDown, viewport]
   );
 
   const handleMouseUp = useCallback(
     (_e: Konva.KonvaEventObject<MouseEvent>) => {
+      if (isPanning) {
+        setIsPanning(false);
+        panStartRef.current = null;
+        return;
+      }
+
       if (!bandStart || !bandCurrent || !sheet) {
         setBandStart(null);
         setBandCurrent(null);
@@ -212,11 +233,12 @@ export function SchematicCanvas({ sheetId, containerWidth, containerHeight, onAr
       setBandStart(null);
       setBandCurrent(null);
     },
-    [bandStart, bandCurrent, sheet, setSelection]
+    [isPanning, bandStart, bandCurrent, sheet, setSelection]
   );
 
   const handleStageClick = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
+      if (e.evt.button === 1) return; // ignore middle click
       if (activeTool === "symbol") { symbolClick(e); return; }
       if (activeTool === "rungColumn") { rungMarkerClick(e); return; }
 
@@ -244,6 +266,15 @@ export function SchematicCanvas({ sheetId, containerWidth, containerHeight, onAr
 
   const handleMouseMove = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
+      if (isPanning && panStartRef.current) {
+        const stage = stageRef.current;
+        if (!stage) return;
+        const sp = stage.getPointerPosition() ?? { x: 0, y: 0 };
+        const p = panStartRef.current;
+        setViewport({ x: p.vx + (sp.x - p.px), y: p.vy + (sp.y - p.py) });
+        return;
+      }
+
       wireMoveMove(e);
       symbolMouseMove(e);
       cloudMouseMove(e);
@@ -256,7 +287,7 @@ export function SchematicCanvas({ sheetId, containerWidth, containerHeight, onAr
         setBandCurrent({ x: pos.x, y: pos.y });
       }
     },
-    [wireMoveMove, symbolMouseMove, cloudMouseMove, rungMouseMove, bandStart]
+    [isPanning, setViewport, wireMoveMove, symbolMouseMove, cloudMouseMove, rungMouseMove, bandStart]
   );
 
   const handleDoubleClick = useCallback(
@@ -337,7 +368,8 @@ export function SchematicCanvas({ sheetId, containerWidth, containerHeight, onAr
   const isRung = activeTool === "rungH" || activeTool === "rungV";
 
   const cursorStyle =
-    activeTool === "wire" || activeTool === "revisionCloud" ? "crosshair"
+    isPanning ? "grabbing"
+    : activeTool === "wire" || activeTool === "revisionCloud" ? "crosshair"
     : activeTool === "symbol" ? "copy"
     : activeTool === "pan" ? "grab"
     : isRung ? "crosshair"

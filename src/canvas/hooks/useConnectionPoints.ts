@@ -1,6 +1,7 @@
 import { useProjectStore } from "../../store/projectStore";
 import { useLibraryStore } from "../../store/libraryStore";
 import { resolveConnectionPoints } from "../../lib/transforms";
+import { getEffectiveConnectionPoints } from "../../lib/connectionPointUtils";
 import type { Point } from "../../models/geometry";
 import type { ResolvedConnectionPoint } from "../../models/symbol";
 import type { SymbolInstance } from "../../models/symbol";
@@ -19,7 +20,8 @@ export function useConnectionPoints(sheetId: string) {
     return symbols.flatMap((inst) => {
       const def = getSymbolById(inst.definitionId);
       if (!def) return [];
-      const resolved = resolveConnectionPoints(def.connectionPoints, inst.x, inst.y, inst.rotation);
+      const cps = getEffectiveConnectionPoints(def);
+      const resolved = resolveConnectionPoints(cps, inst.x, inst.y, inst.rotation);
       return resolved.map((rcp) => ({ ...rcp, instanceId: inst.id }));
     });
   }

@@ -131,6 +131,18 @@ function SymbolProperties({
           ))}
         </div>
       </PropRow>
+      <PropRow label="Scale">
+        <input
+          type="range"
+          className="prop-slider"
+          min={0.25}
+          max={4}
+          step={0.05}
+          value={instance.scale}
+          onChange={(e) => onUpdate({ scale: Number(e.target.value) })}
+        />
+        <span className="prop-scale-value">{Math.round(instance.scale * 100)}%</span>
+      </PropRow>
       {attrDefs.map((attr) => (
         <PropRow key={attr.name} label={attr.label}>
           <input

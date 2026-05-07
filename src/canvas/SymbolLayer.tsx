@@ -7,7 +7,7 @@ import { useCanvasStore } from "../store/canvasStore";
 import { useLibraryStore } from "../store/libraryStore";
 import { useProjectStore } from "../store/projectStore";
 import { useThemeStore } from "../store/themeStore";
-import { resolveConnectionPoints } from "../lib/transforms";
+import { getEffectiveConnectionPoints } from "../lib/connectionPointUtils";
 import { snapToGrid } from "./routing/orthogonalRouter";
 
 const SYMBOL_SIZE = 60;
@@ -53,7 +53,7 @@ export function SymbolNode({ instance, isSelected, onSelect, showConnectionPoint
   if (!def || !img) return null;
 
   const half = SYMBOL_SIZE / 2;
-  const resolved = resolveConnectionPoints(def.connectionPoints, 0, 0, instance.rotation);
+  const effectiveCPs = getEffectiveConnectionPoints(def);
 
   const handleDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
     const x = snapToGrid(e.target.x(), gridSize);
@@ -95,11 +95,11 @@ export function SymbolNode({ instance, isSelected, onSelect, showConnectionPoint
         />
       )}
       {showConnectionPoints &&
-        resolved.map((cp) => (
+        effectiveCPs.map((cp) => (
           <Circle
             key={cp.id}
-            x={cp.worldX - instance.x}
-            y={cp.worldY - instance.y}
+            x={cp.x}
+            y={cp.y}
             radius={3}
             fill="#00aa44"
             stroke="#007733"
