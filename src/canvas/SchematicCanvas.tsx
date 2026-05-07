@@ -9,6 +9,7 @@ import { useWireTool } from "./hooks/useWireTool";
 import { useSymbolTool } from "./hooks/useSymbolTool";
 import { useRevisionCloudTool } from "./hooks/useRevisionCloudTool";
 import { useRungTool } from "./hooks/useRungTool";
+import { useRungMarkerTool } from "./hooks/useRungMarkerTool";
 import { useCanvasStore } from "../store/canvasStore";
 import { useProjectStore } from "../store/projectStore";
 import { useThemeStore } from "../store/themeStore";
@@ -16,8 +17,9 @@ import { stageRegistry } from "./stageRef";
 import type { Point } from "../models/geometry";
 import type { Wire } from "../models/wire";
 import type { SymbolInstance } from "../models/symbol";
+import { PIXELS_PER_MM } from "../lib/constants";
 
-const PIXELS_PER_MM = 3.7795;
+const SYMBOL_HALF = 30;
 const MIN_SCALE = 0.1;
 const MAX_SCALE = 10;
 const ZOOM_FACTOR = 1.1;
@@ -61,6 +63,7 @@ export function SchematicCanvas({ sheetId, containerWidth, containerHeight, onAr
   } = useWireTool(sheetId);
 
   const { handleMouseMove: symbolMouseMove, handleClick: symbolClick } = useSymbolTool();
+  const { handleClick: rungMarkerClick } = useRungMarkerTool();
 
   const {
     cloudPoints,
@@ -155,19 +158,26 @@ export function SchematicCanvas({ sheetId, containerWidth, containerHeight, onAr
         const maxX = Math.max(bandStart.x, bandCurrent.x);
         const minY = Math.min(bandStart.y, bandCurrent.y);
         const maxY = Math.max(bandStart.y, bandCurrent.y);
+        const isCrossing = bandStart.x > bandCurrent.x; // left drag = crossing
+
+        const inside = (x: number, y: number) =>
+          x >= minX && x <= maxX && y >= minY && y <= maxY;
 
         const ids: string[] = [];
         for (const el of sheet.elements) {
           if (el.type === "wire") {
             const wire = el as Wire;
-            if (wire.points.some((p) => p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY)) {
-              ids.push(el.id);
-            }
+            const hit = isCrossing
+              ? wire.points.some((p) => inside(p.x, p.y))
+              : wire.points.every((p) => inside(p.x, p.y));
+            if (hit) ids.push(el.id);
           } else if (el.type === "symbol") {
             const sym = el as SymbolInstance;
-            if (sym.x >= minX && sym.x <= maxX && sym.y >= minY && sym.y <= maxY) {
-              ids.push(el.id);
-            }
+            const hit = isCrossing
+              ? sym.x + SYMBOL_HALF >= minX && sym.x - SYMBOL_HALF <= maxX &&
+                sym.y + SYMBOL_HALF >= minY && sym.y - SYMBOL_HALF <= maxY
+              : inside(sym.x, sym.y);
+            if (hit) ids.push(el.id);
           }
         }
         if (ids.length > 0) setSelection(ids);
@@ -182,6 +192,7 @@ export function SchematicCanvas({ sheetId, containerWidth, containerHeight, onAr
   const handleStageClick = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
       if (activeTool === "symbol") { symbolClick(e); return; }
+      if (activeTool === "rungColumn") { rungMarkerClick(e); return; }
 
       if (activeTool === "sourceArrow" || activeTool === "destArrow") {
         const stage = stageRef.current;
@@ -304,11 +315,12 @@ export function SchematicCanvas({ sheetId, containerWidth, containerHeight, onAr
     : activeTool === "symbol" ? "copy"
     : activeTool === "pan" ? "grab"
     : isRung ? "crosshair"
+    : activeTool === "rungColumn" ? "cell"
     : "default";
 
   if (!sheet) return null;
 
-  // Rubber-band rect in canvas coords
+  const isCrossingBand = !!(bandStart && bandCurrent && bandStart.x > bandCurrent.x);
   const bandRect = bandStart && bandCurrent ? {
     x: Math.min(bandStart.x, bandCurrent.x),
     y: Math.min(bandStart.y, bandCurrent.y),
@@ -388,10 +400,10 @@ export function SchematicCanvas({ sheetId, containerWidth, containerHeight, onAr
             y={bandRect.y}
             width={bandRect.w}
             height={bandRect.h}
-            stroke="#0066cc"
+            stroke={isCrossingBand ? "#00aa44" : "#0066cc"}
             strokeWidth={1}
-            fill="rgba(0,102,204,0.07)"
-            dash={[5, 3]}
+            fill={isCrossingBand ? "rgba(0,170,68,0.09)" : "rgba(0,102,204,0.07)"}
+            dash={isCrossingBand ? [] : [5, 3]}
           />
         </Layer>
       )}

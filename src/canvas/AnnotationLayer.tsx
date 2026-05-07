@@ -4,17 +4,14 @@ import { useThemeStore } from "../store/themeStore";
 import type { Sheet } from "../models/sheet";
 import type { RevisionCloud } from "../models/revision";
 import type { CrossSheetArrow } from "../models/crossSheetArrow";
+import type { RungMarker } from "../models/rungMarker";
 import { useProjectStore } from "../store/projectStore";
 import { useCanvasStore } from "../store/canvasStore";
 import { generateRevisionCloudPath } from "../lib/revisionCloud";
-import { detectRungs } from "../lib/rungNumbering";
+import { HEX_W, HEX_H, HEX_NOTCH } from "../lib/constants";
 import { BUILTIN_TEMPLATE_ID, DEFAULT_TITLE_BLOCK_FIELDS } from "../models/titleBlock";
 
-const HEX_W = 38;
-const HEX_H = 22;
-const HEX_NOTCH = 7; // diagonal cut width
-
-function HexRungBadge({ x, y, label, isDark }: { x: number; y: number; label: string; isDark: boolean }) {
+export function HexRungBadge({ x, y, label, isDark }: { x: number; y: number; label: string; isDark: boolean }) {
   return (
     <Group x={x} y={y} listening={false}>
       <Shape
@@ -195,20 +192,17 @@ function TitleBlockRenderer({ sheet, W, H }: { sheet: Sheet; W: number; H: numbe
 }
 
 export function AnnotationLayer({ sheet, canvasWidth, canvasHeight }: Props) {
-  const settings = useProjectStore((s) => s.project.settings);
   const setActiveSheet = useCanvasStore((s) => s.setActiveSheet);
   const sheets = useProjectStore((s) => s.project.sheets);
   const theme = useThemeStore((s) => s.theme);
   const isDark = theme === "dark";
 
-  const sheetIndex = Math.max(0, sheets.findIndex((s) => s.id === sheet.id));
-  const rungs = detectRungs(sheet, settings.rungNumberFormat, sheetIndex);
+  const rungMarkers = sheet.elements
+    .filter((e): e is RungMarker => e.type === "rungMarker")
+    .sort((a, b) => a.number - b.number);
   const revClouds = sheet.elements.filter((e): e is RevisionCloud => e.type === "revisionCloud");
   const arrows = sheet.elements.filter((e): e is CrossSheetArrow => e.type === "crossSheetArrow");
   const layerMap = new Map(sheet.layers.map((l) => [l.id, l]));
-
-  const isLeft = settings.rungNumberFormat.position === "left";
-  const RUNG_CENTER_X = isLeft ? HEX_W / 2 + 4 : canvasWidth - HEX_W / 2 - 4;
 
   const navigateTo = (targetSheetId: string) => {
     const target = sheets.find((s) => s.id === targetSheetId);
@@ -218,12 +212,12 @@ export function AnnotationLayer({ sheet, canvasWidth, canvasHeight }: Props) {
   return (
     <Layer>
       {/* Rung hexagonal badges */}
-      {rungs.map((rung) => (
+      {rungMarkers.map((rm) => (
         <HexRungBadge
-          key={rung.label}
-          x={RUNG_CENTER_X}
-          y={rung.y}
-          label={rung.label}
+          key={rm.id}
+          x={rm.x}
+          y={rm.y}
+          label={String(rm.number)}
           isDark={isDark}
         />
       ))}

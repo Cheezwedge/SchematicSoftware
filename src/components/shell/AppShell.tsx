@@ -25,7 +25,7 @@ import type { DxfImportResult } from "../../lib/dxfImport";
 import type { SymbolInstance } from "../../models/symbol";
 import type { CrossSheetArrow } from "../../models/crossSheetArrow";
 import type { Point } from "../../models/geometry";
-import { rungNumberForY } from "../../lib/rungNumbering";
+import { rungNumberForXY } from "../../lib/rungNumbering";
 
 export function AppShell() {
   const canvasContainerRef = useRef<HTMLDivElement>(null);
@@ -241,9 +241,8 @@ export function AppShell() {
   const pendingRungNumber = (() => {
     if (!pendingPlacement || !activeSheetId) return undefined;
     const sheet = project.sheets.find((s) => s.id === activeSheetId);
-    const sheetIndex = project.sheets.findIndex((s) => s.id === activeSheetId);
     if (!sheet) return undefined;
-    return rungNumberForY(sheet, pendingPlacement.pos.y, sheetIndex, project.settings.rungNumberFormat) ?? undefined;
+    return rungNumberForXY(sheet, pendingPlacement.pos.x, pendingPlacement.pos.y) ?? undefined;
   })();
 
   return (

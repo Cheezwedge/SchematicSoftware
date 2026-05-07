@@ -18,7 +18,11 @@ import type { Wire } from "../models/wire";
 import type { SymbolInstance } from "../models/symbol";
 import type { RevisionCloud } from "../models/revision";
 import type { CrossSheetArrow } from "../models/crossSheetArrow";
+import type { RungMarker } from "../models/rungMarker";
 import type { Sheet } from "../models/sheet";
+import { HexRungBadge } from "./AnnotationLayer";
+import { useRungMarkerTool } from "./hooks/useRungMarkerTool";
+import { PIXELS_PER_MM as _PPM } from "../lib/constants";
 
 function isHexDark(hex: string): boolean {
   const r = parseInt(hex.slice(1, 3), 16) || 0;
@@ -30,7 +34,8 @@ function resolveWireColor(color: string, theme: string): string {
   return theme === "dark" && isHexDark(color) ? "#cccccc" : color;
 }
 
-const PIXELS_PER_MM = 3.7795;
+const PIXELS_PER_MM = _PPM;
+const SYMBOL_HALF = 30;
 const SHEET_GAP = 60;
 const LABEL_Y = -22;
 const MIN_SCALE = 0.05;
@@ -126,6 +131,7 @@ export function MultiSheetCanvas({ containerWidth, containerHeight, onArrowClick
   } = useWireTool(activeSheetId ?? "");
 
   const { handleMouseMove: symbolMouseMove, handleClick: symbolClick } = useSymbolTool();
+  const { handleClick: rungMarkerClick } = useRungMarkerTool();
 
   const {
     cloudPoints,
@@ -268,22 +274,27 @@ export function MultiSheetCanvas({ containerWidth, containerHeight, onArrowClick
         const minY = Math.min(bandStart.y, bandCurrent.y);
         const maxY = Math.max(bandStart.y, bandCurrent.y);
 
+        const isCrossing = bandStart.x > bandCurrent.x;
+        const inside = (x: number, y: number) =>
+          x >= minX && x <= maxX && y >= minY && y <= maxY;
+
         const ids: string[] = [];
         for (const { sheet, x: sx } of sheetLayouts) {
           for (const el of sheet.elements) {
             if (el.type === "wire") {
               const wire = el as Wire;
-              if (
-                wire.points.some((p) => {
-                  const wx = p.x + sx;
-                  return wx >= minX && wx <= maxX && p.y >= minY && p.y <= maxY;
-                })
-              ) ids.push(el.id);
+              const hit = isCrossing
+                ? wire.points.some((p) => inside(p.x + sx, p.y))
+                : wire.points.every((p) => inside(p.x + sx, p.y));
+              if (hit) ids.push(el.id);
             } else if (el.type === "symbol") {
               const sym = el as SymbolInstance;
               const wx = sym.x + sx;
-              if (wx >= minX && wx <= maxX && sym.y >= minY && sym.y <= maxY)
-                ids.push(el.id);
+              const hit = isCrossing
+                ? wx + SYMBOL_HALF >= minX && wx - SYMBOL_HALF <= maxX &&
+                  sym.y + SYMBOL_HALF >= minY && sym.y - SYMBOL_HALF <= maxY
+                : inside(wx, sym.y);
+              if (hit) ids.push(el.id);
             }
           }
         }
@@ -299,6 +310,7 @@ export function MultiSheetCanvas({ containerWidth, containerHeight, onArrowClick
   const handleStageClick = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
       if (activeTool === "symbol") { symbolClick(e); return; }
+      if (activeTool === "rungColumn") { rungMarkerClick(e); return; }
 
       if (activeTool === "sourceArrow" || activeTool === "destArrow") {
         const stage = stageRef.current;
@@ -450,8 +462,11 @@ export function MultiSheetCanvas({ containerWidth, containerHeight, onArrowClick
       ? "grab"
       : isRung
       ? "crosshair"
+      : activeTool === "rungColumn"
+      ? "cell"
       : "default";
 
+  const isCrossingBand = !!(bandStart && bandCurrent && bandStart.x > bandCurrent.x);
   const bandRect =
     bandStart && bandCurrent
       ? {
@@ -656,6 +671,19 @@ export function MultiSheetCanvas({ containerWidth, containerHeight, onArrowClick
                 );
               })}
 
+              {/* Rung marker badges */}
+              {sheet.elements
+                .filter((el): el is RungMarker => el.type === "rungMarker")
+                .map((rm) => (
+                  <HexRungBadge
+                    key={rm.id}
+                    x={rm.x}
+                    y={rm.y}
+                    label={String(rm.number)}
+                    isDark={theme === "dark"}
+                  />
+                ))}
+
               {/* Ghost symbol on active sheet only */}
               {isActive && activeTool === "symbol" && <GhostSymbol />}
             </Group>
@@ -709,10 +737,10 @@ export function MultiSheetCanvas({ containerWidth, containerHeight, onArrowClick
             y={bandRect.y}
             width={bandRect.w}
             height={bandRect.h}
-            stroke="#0066cc"
+            stroke={isCrossingBand ? "#00aa44" : "#0066cc"}
             strokeWidth={1}
-            fill="rgba(0,102,204,0.07)"
-            dash={[5, 3]}
+            fill={isCrossingBand ? "rgba(0,170,68,0.09)" : "rgba(0,102,204,0.07)"}
+            dash={isCrossingBand ? [] : [5, 3]}
           />
         )}
       </Layer>

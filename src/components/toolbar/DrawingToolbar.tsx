@@ -8,8 +8,9 @@ const TOOLS: { id: Tool; label: string; title: string }[] = [
 ];
 
 const RUNG_TOOLS: { id: Tool; label: string; title: string }[] = [
-  { id: "rungH", label: "═", title: "Horizontal Rung / Rail (H) — click start, click end, double-click to finish" },
-  { id: "rungV", label: "‖", title: "Vertical Bus / Rail (V) — click start, click end, double-click to finish" },
+  { id: "rungH",      label: "═",  title: "Horizontal Rung / Rail (H)" },
+  { id: "rungV",      label: "‖",  title: "Vertical Bus / Rail (V)" },
+  { id: "rungColumn", label: "⬡",  title: "Insert Rung Column — click canvas to place a column of hex badges continuing from the last rung number on this sheet" },
 ];
 
 const ARROW_TOOLS: { id: Tool; label: string; title: string }[] = [

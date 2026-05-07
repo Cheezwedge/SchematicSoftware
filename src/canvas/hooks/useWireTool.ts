@@ -10,7 +10,7 @@ import { useProjectStore } from "../../store/projectStore";
 import { useCanvasStore } from "../../store/canvasStore";
 import { DEFAULT_WIRE_COLOR, DEFAULT_WIRE_GAUGE } from "../../models/wire";
 import { nextWireNumber } from "../../lib/wireNumbering";
-import { rungNumberForY } from "../../lib/rungNumbering";
+import { rungNumberForXY } from "../../lib/rungNumbering";
 
 type WireState = "idle" | "drawing";
 
@@ -25,7 +25,6 @@ export function useWireTool(sheetId: string) {
   const getSheet = useProjectStore((s) => s.getSheet);
   const getActiveLayer = useProjectStore((s) => s.getActiveLayer);
   const settings = useProjectStore((s) => s.project.settings);
-  const sheets = useProjectStore((s) => s.project.sheets);
   const activeLayerId = useCanvasStore((s) => s.activeLayerId);
   const activeTool = useCanvasStore((s) => s.activeTool);
 
@@ -64,10 +63,10 @@ export function useWireTool(sheetId: string) {
           .filter((e): e is Wire => e.type === "wire")
           .map((w) => w.number);
 
-        const sheetIndex = sheets.findIndex((s) => s.id === sheetId);
+        const midX = (startPoint.x + pos.x) / 2;
         const midY = (startPoint.y + pos.y) / 2;
         const number =
-          rungNumberForY(sheet!, midY, sheetIndex, settings.rungNumberFormat) ??
+          rungNumberForXY(sheet!, midX, midY) ??
           nextWireNumber(existingNumbers, settings.wireNumberFormat);
 
         const wire: Wire = {
@@ -87,7 +86,7 @@ export function useWireTool(sheetId: string) {
         setPreviewPoints([pos]);
       }
     },
-    [activeTool, state, startPoint, getPointerPos, sheetId, addElement, getSheet, getActiveLayer, activeLayerId, settings, sheets]
+    [activeTool, state, startPoint, getPointerPos, sheetId, addElement, getSheet, getActiveLayer, activeLayerId, settings]
   );
 
   const handleMouseMove = useCallback(

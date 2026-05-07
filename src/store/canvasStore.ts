@@ -2,7 +2,7 @@ import { create } from "zustand";
 import type { Point } from "../models/geometry";
 import type { SchematicElement } from "../models/sheet";
 
-export type Tool = "select" | "wire" | "symbol" | "sourceArrow" | "destArrow" | "revisionCloud" | "pan" | "rungH" | "rungV";
+export type Tool = "select" | "wire" | "symbol" | "sourceArrow" | "destArrow" | "revisionCloud" | "pan" | "rungH" | "rungV" | "rungColumn";
 export type ViewMode = "single" | "multi";
 
 export interface PendingPlacement {

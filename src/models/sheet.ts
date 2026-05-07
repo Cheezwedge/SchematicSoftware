@@ -4,8 +4,9 @@ import type { SymbolInstance } from "./symbol";
 import type { RevisionCloud } from "./revision";
 import type { TitleBlockData } from "./titleBlock";
 import type { CrossSheetArrow } from "./crossSheetArrow";
+import type { RungMarker } from "./rungMarker";
 
-export type SchematicElement = Wire | SymbolInstance | RevisionCloud | CrossSheetArrow;
+export type SchematicElement = Wire | SymbolInstance | RevisionCloud | CrossSheetArrow | RungMarker;
 
 export interface Sheet {
   id: string;
