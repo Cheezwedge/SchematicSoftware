@@ -88,7 +88,26 @@ export async function dwgToSymbol(fileBuffer: ArrayBuffer, fileName: string): Pr
   libredwg.dwg_free(dwgPtr);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const entities: any[] = db.entities ?? [];
+  const modelEntities: any[] = db.entities ?? [];
+
+  // AutoCAD symbol DWG files store geometry in block definitions, not model space.
+  // Model space contains only an INSERT reference; the actual LINE/ARC/CIRCLE live
+  // in BLOCK_RECORD entries whose names don't start with '*' (user-defined blocks).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const blockRecords: any[] = db.tables?.BLOCK_RECORD?.entries ?? [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const userBlockEntities: any[] = blockRecords
+    .filter((btr) => btr.name && !btr.name.startsWith("*"))
+    .flatMap((btr) => btr.entities ?? []);
+
+  const GEOM_TYPES = new Set(["LINE", "LWPOLYLINE", "POLYLINE", "CIRCLE", "ARC"]);
+  const modelHasGeom = modelEntities.some((e) => GEOM_TYPES.has(e.type));
+
+  // Prefer model space if it has drawable geometry; otherwise use user block entities
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const entities: any[] = modelHasGeom ? modelEntities
+    : userBlockEntities.length > 0 ? userBlockEntities
+    : modelEntities;
 
   // Collect raw points, supporting both field-name conventions
   const rawPts: Pt[] = [];
