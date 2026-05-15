@@ -19,8 +19,13 @@ function buildNormalize(pts: Pt[]): { norm: (x: number, y: number) => Pt; scale:
 
   const q1x = q(xs, 0.25), q3x = q(xs, 0.75);
   const q1y = q(ys, 0.25), q3y = q(ys, 0.75);
-  const fenceX = (q3x - q1x) * 3 || (xs[xs.length - 1] - xs[0]) || 1;
-  const fenceY = (q3y - q1y) * 3 || (ys[ys.length - 1] - ys[0]) || 1;
+  const iqrX = q3x - q1x;
+  const iqrY = q3y - q1y;
+  // Use 1.5×IQR fence (standard outlier rule); if IQR=0 use median±5% of range as fallback
+  const rangeX = xs[xs.length - 1] - xs[0] || 1;
+  const rangeY = ys[ys.length - 1] - ys[0] || 1;
+  const fenceX = iqrX > 0 ? iqrX * 1.5 : rangeX * 0.05 + 1;
+  const fenceY = iqrY > 0 ? iqrY * 1.5 : rangeY * 0.05 + 1;
 
   const core = pts.filter(p =>
     p.x >= q1x - fenceX && p.x <= q3x + fenceX &&
@@ -57,29 +62,22 @@ function svgRadiusToKonva(r: number): number {
 }
 
 /**
- * DXF arcs travel CCW from startAngle to endAngle (math convention, Y-up).
- * After Y-flip for SVG/Konva (Y-down), the same arc travels CW, so sweep-flag=1.
- * large-arc-flag depends on the CCW span in DXF: if > 180° → large=1.
+ * DXF arcs travel CCW from startAngle to endAngle (degrees, Y-up math convention).
+ * After Y-flip for SVG/Konva (Y-down), the same arc travels CW → sweep-flag=1.
  */
 function arcLargeFlag(startDeg: number, endDeg: number): 0 | 1 {
   const ccwSpan = ((endDeg - startDeg) % 360 + 360) % 360 || 360;
   return ccwSpan > 180 ? 1 : 0;
 }
 
-export function dxfToSymbol(content: string, fileName: string): SymbolDefinition {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const parser = new (DxfParser as any)();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let dxf: any;
-  try {
-    dxf = parser.parseSync(content);
-  } catch {
-    throw new Error("Could not parse file. If this is a DWG file, open it in CAD software and save as DXF first.");
-  }
+const GEOM_TYPES = new Set(["LINE", "LWPOLYLINE", "POLYLINE", "CIRCLE", "ARC"]);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const entities: any[] = dxf?.entities ?? [];
-
+/**
+ * Converts a flat array of DXF entities (already parsed by dxf-parser) into a SymbolDefinition.
+ * Angles are expected in degrees (DXF text format convention).
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function entitiesToSymbol(entities: any[], name: string, tags: string[]): SymbolDefinition {
   const rawPts: Pt[] = [];
   for (const e of entities) {
     if (e.type === "LINE") {
@@ -92,7 +90,7 @@ export function dxfToSymbol(content: string, fileName: string): SymbolDefinition
     }
   }
 
-  if (rawPts.length === 0) throw new Error("No drawable geometry found in DXF file.");
+  if (rawPts.length === 0) throw new Error("No drawable geometry found (LINE, POLYLINE, CIRCLE, ARC).");
 
   const { norm, scale: normScale } = buildNormalize(rawPts);
   const svgParts: string[] = [];
@@ -109,13 +107,11 @@ export function dxfToSymbol(content: string, fileName: string): SymbolDefinition
       const verts: Pt[] = (e.vertices ?? []).map((v: Pt) => norm(v.x, v.y));
       if (verts.length < 2) continue;
       const closed: boolean = !!(e.closed || (e.type === "LWPOLYLINE" && (e.flag & 1)));
-      // SVG: polyline / polygon element for smooth joins
       const ptsStr = verts.map(v => `${v.x},${v.y}`).join(" ");
       svgParts.push(closed
         ? `<polygon points="${ptsStr}" stroke="currentColor" stroke-width="1" fill="none"/>`
         : `<polyline points="${ptsStr}" stroke="currentColor" stroke-width="1" fill="none"/>`
       );
-      // Konva: single Line with all vertices for proper joins
       geometry.push({
         t: "P",
         pts: verts.flatMap(v => [svgToKonva(v.x), svgToKonva(v.y)]),
@@ -133,7 +129,7 @@ export function dxfToSymbol(content: string, fileName: string): SymbolDefinition
       const r_svg = Math.round(e.radius * normScale * 10) / 10;
       const startDeg = e.startAngle ?? 0;
       const endDeg = e.endAngle ?? 360;
-      // Negate angles because SVG/Konva Y-axis is flipped relative to DXF (Y-up)
+      // Negate angle to flip Y (DXF Y-up → SVG Y-down)
       const startRad = (-startDeg * Math.PI) / 180;
       const endRad = (-endDeg * Math.PI) / 180;
       const x1 = Math.round((c.x + r_svg * Math.cos(startRad)) * 10) / 10;
@@ -154,9 +150,7 @@ export function dxfToSymbol(content: string, fileName: string): SymbolDefinition
 
   if (svgParts.length === 0) throw new Error("No supported geometry types found (LINE, POLYLINE, CIRCLE, ARC).");
 
-  const name = fileName.replace(/\.[^.]+$/, "");
   const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VIEWBOX} ${VIEWBOX}">${svgParts.join("")}</svg>`;
-
   return {
     id: uuidv4(),
     name,
@@ -169,9 +163,50 @@ export function dxfToSymbol(content: string, fileName: string): SymbolDefinition
       { name: "tag", label: "Tag", defaultValue: "", required: false },
       { name: "description", label: "Description", defaultValue: "", required: false },
     ],
-    tags: ["imported", "dxf"],
+    tags,
     geometry,
   };
+}
+
+/**
+ * Parses a DXF text string and returns a SymbolDefinition.
+ * Checks model space first; falls back to user-defined block entities if model space
+ * has no drawable geometry (typical for AutoCAD symbol files where geometry lives in
+ * a named block and model space only contains an INSERT reference).
+ */
+export function parseDxfContent(content: string, fileName: string, tags = ["imported", "dxf"]): SymbolDefinition {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const parser = new (DxfParser as any)();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let dxf: any;
+  try {
+    dxf = parser.parseSync(content);
+  } catch {
+    throw new Error("Could not parse DXF content.");
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const modelEntities: any[] = dxf?.entities ?? [];
+  const modelHasGeom = modelEntities.some((e: { type: string }) => GEOM_TYPES.has(e.type));
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const blocks: Record<string, { name: string; entities: any[] }> = dxf?.blocks ?? {};
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const blockEntities: any[] = Object.values(blocks)
+    .filter(b => b.name && !b.name.startsWith("*"))
+    .flatMap(b => b.entities ?? []);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const entities: any[] = modelHasGeom ? modelEntities
+    : blockEntities.length > 0 ? blockEntities
+    : modelEntities;
+
+  const name = fileName.replace(/\.[^.]+$/, "");
+  return entitiesToSymbol(entities, name, tags);
+}
+
+export function dxfToSymbol(content: string, fileName: string): SymbolDefinition {
+  return parseDxfContent(content, fileName, ["imported", "dxf"]);
 }
 
 export function loadDxfSymbolFile(): Promise<{ content: string; name: string }> {
