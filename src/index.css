@@ -635,6 +635,41 @@ html, body, #root {
   padding: 2px 4px 6px 16px;
 }
 
+.symbol-thumb-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.symbol-thumb-wrap .symbol-delete-btn {
+  display: none;
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  line-height: 14px;
+  font-size: 12px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  cursor: pointer;
+  z-index: 2;
+}
+
+.symbol-thumb-wrap:hover .symbol-delete-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.symbol-thumb-wrap .symbol-delete-btn:hover {
+  background: #cc3333;
+  color: #fff;
+  border-color: #aa2222;
+}
+
 .symbol-thumb {
   width: 44px;
   height: 44px;

@@ -12,6 +12,7 @@ export function LibraryPanel() {
   const searchQuery = useLibraryStore((s) => s.searchQuery);
   const setSearchQuery = useLibraryStore((s) => s.setSearchQuery);
   const addSymbolToUserLibrary = useLibraryStore((s) => s.addSymbolToUserLibrary);
+  const removeSymbolFromUserLibrary = useLibraryStore((s) => s.removeSymbolFromUserLibrary);
   const setPendingSymbol = useCanvasStore((s) => s.setPendingSymbol);
   const setActiveTool = useCanvasStore((s) => s.setActiveTool);
 
@@ -24,7 +25,7 @@ export function LibraryPanel() {
     let all = libraries.flatMap((l) => {
       if (filterLib === "builtin" && !l.isBuiltIn) return [];
       if (filterLib === "user" && l.isBuiltIn) return [];
-      return l.symbols;
+      return l.symbols.map((s) => ({ ...s, isUser: !l.isBuiltIn }));
     });
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -160,13 +161,26 @@ export function LibraryPanel() {
             {!collapsed.has(cat) && (
               <div className="library-category__symbols">
                 {syms.map((sym) => (
-                  <button
-                    key={sym.id}
-                    className="symbol-thumb"
-                    title={sym.name}
-                    onClick={() => handleSelect(sym.id)}
-                    dangerouslySetInnerHTML={{ __html: sym.svgContent }}
-                  />
+                  <div key={sym.id} className="symbol-thumb-wrap">
+                    <button
+                      className="symbol-thumb"
+                      title={sym.name}
+                      onClick={() => handleSelect(sym.id)}
+                      dangerouslySetInnerHTML={{ __html: sym.svgContent }}
+                    />
+                    {sym.isUser && (
+                      <button
+                        className="symbol-delete-btn"
+                        title={`Remove "${sym.name}"`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeSymbolFromUserLibrary(sym.id);
+                        }}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
                 ))}
               </div>
             )}

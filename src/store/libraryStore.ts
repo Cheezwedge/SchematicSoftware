@@ -22,6 +22,7 @@ interface LibraryState {
   setSearchQuery: (q: string) => void;
   setLibraries: (libs: SymbolLibrary[]) => void;
   addSymbolToUserLibrary: (symbol: SymbolDefinition) => void;
+  removeSymbolFromUserLibrary: (id: string) => void;
   setUserLibrarySymbols: (symbols: SymbolDefinition[]) => void;
   getFilteredSymbols: () => SymbolDefinition[];
   getSymbolById: (id: string) => SymbolDefinition | undefined;
@@ -46,6 +47,20 @@ export const useLibraryStore = create<LibraryState>()((set, get) => ({
       const newUserLib = newLibs.find((l) => !l.isBuiltIn);
       if (newUserLib) saveUserLibraryToStorage(newUserLib.symbols);
       return { libraries: newLibs };
+    });
+  },
+
+  removeSymbolFromUserLibrary: (id) => {
+    set((state) => {
+      const userLib = state.libraries.find((l) => !l.isBuiltIn);
+      if (!userLib) return state;
+      const newSymbols = userLib.symbols.filter((s) => s.id !== id);
+      saveUserLibraryToStorage(newSymbols);
+      return {
+        libraries: state.libraries.map((l) =>
+          l.id === userLib.id ? { ...l, symbols: newSymbols } : l
+        ),
+      };
     });
   },
 
