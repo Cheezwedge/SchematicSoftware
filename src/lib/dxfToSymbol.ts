@@ -191,15 +191,26 @@ export function parseDxfContent(content: string, fileName: string, tags = ["impo
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const blocks: Record<string, { name: string; entities: any[] }> = dxf?.blocks ?? {};
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const blockEntities: any[] = Object.values(blocks)
-    .filter(b => b.name && !b.name.startsWith("*"))
-    .flatMap(b => b.entities ?? []);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const entities: any[] = modelHasGeom ? modelEntities
-    : blockEntities.length > 0 ? blockEntities
-    : modelEntities;
+  let entities: any[];
+  if (modelHasGeom) {
+    entities = modelEntities;
+  } else {
+    // AutoCAD symbol files often have no geometry in model space — only an INSERT
+    // referencing a named block. Look up that specific block instead of flattening
+    // all blocks (which mixes entities from unrelated blocks and causes jumbled output).
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const insert = modelEntities.find((e: any) => e.type === "INSERT");
+    if (insert?.name && blocks[insert.name]) {
+      entities = blocks[insert.name].entities ?? [];
+    } else {
+      // Fallback: flatten all user-defined blocks (non-system blocks don't start with "*")
+      entities = Object.values(blocks)
+        .filter((b) => b.name && !b.name.startsWith("*"))
+        .flatMap((b) => b.entities ?? []);
+    }
+  }
 
   const name = fileName.replace(/\.[^.]+$/, "");
   return entitiesToSymbol(entities, name, tags);

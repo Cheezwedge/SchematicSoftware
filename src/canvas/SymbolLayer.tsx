@@ -89,9 +89,10 @@ function VectorSymbolNode({
             <Line
               key={i}
               points={el.pts}
-              stroke={strokeColor}
-              strokeWidth={sw}
+              stroke={el.filled ? undefined : strokeColor}
+              strokeWidth={el.filled ? 0 : sw}
               closed={el.closed}
+              fill={el.filled ? strokeColor : "transparent"}
               lineCap="round"
               lineJoin="round"
               listening={false}
@@ -219,19 +220,31 @@ export function GhostSymbol() {
   const ghostPos = useCanvasStore((s) => s.ghostPosition);
   const defId = useCanvasStore((s) => s.pendingSymbolDefinitionId);
   const rotation = useCanvasStore((s) => s.pendingSymbolRotation);
+  const viewportScale = useCanvasStore((s) => s.viewport.scale);
   const theme = useThemeStore((s) => s.theme);
   const def = useLibraryStore((s) =>
     defId ? s.libraries.flatMap((l) => l.symbols).find((sym) => sym.id === defId) : undefined
   );
   const color = theme === "dark" ? "#cccccc" : "#000000";
-  const img = useSvgImage(def?.svgContent ?? "", color);
+  // Only load raster image for symbols without vector geometry
+  const img = useSvgImage(def?.geometry ? "" : (def?.svgContent ?? ""), color);
 
-  if (!ghostPos || !def || !img) return null;
+  if (!ghostPos || !def) return null;
+  if (!def.geometry && !img) return null;
 
   const half = SYMBOL_SIZE / 2;
   return (
     <Group x={ghostPos.x} y={ghostPos.y} rotation={rotation} opacity={0.5} listening={false}>
-      <KonvaImage image={img} x={-half} y={-half} width={SYMBOL_SIZE} height={SYMBOL_SIZE} />
+      {def.geometry ? (
+        <VectorSymbolNode
+          geometry={def.geometry}
+          strokeColor={color}
+          viewportScale={viewportScale}
+          instanceScale={1}
+        />
+      ) : (
+        <KonvaImage image={img!} x={-half} y={-half} width={SYMBOL_SIZE} height={SYMBOL_SIZE} />
+      )}
     </Group>
   );
 }
