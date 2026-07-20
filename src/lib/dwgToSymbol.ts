@@ -1,5 +1,6 @@
-import { v4 as uuidv4 } from "uuid";
 import type { SymbolDefinition } from "../models/symbol";
+import { entitiesToSymbol } from "./dxfToSymbol";
+import { flattenSvgToEntities } from "./svgFlatten";
 
 /** Run DWG→SVG conversion inside a Web Worker so WASM never blocks the main thread. */
 function convertDwgToSvg(buffer: ArrayBuffer): Promise<string> {
@@ -22,54 +23,25 @@ function convertDwgToSvg(buffer: ArrayBuffer): Promise<string> {
 }
 
 /**
- * Extracts the viewBox string from an SVG document.
- * Returns a fallback "0 0 100 100" if not found.
+ * Imports a DWG file as native vector geometry.
+ *
+ * The worker converts the DWG with the library's own SvgConverter (which correctly
+ * resolves INSERT/block references), then flattenSvgToEntities() resolves the SVG's
+ * <use>/<defs> structure and transform chains into plain world-space lines, circles,
+ * and polylines. entitiesToSymbol() normalizes those into the app's standard symbol
+ * format with a geometry array, so imported symbols render exactly like built-in
+ * ones — stroke width stays constant on screen regardless of zoom or symbol scale.
  */
-function extractViewBox(svgString: string): string {
-  const m = svgString.match(/viewBox="([^"]+)"/);
-  return m ? m[1] : "0 0 100 100";
-}
-
-/**
- * Post-processes the raw SVG from libredwg's SvgConverter so it works as a
- * theme-aware Konva image:
- * - Strips XML declaration (browser rejects data-URI SVGs with <?xml...?>)
- * - Makes default black strokes follow the theme via currentColor
- * - Bumps stroke-width from the near-invisible 0.1% default to something visible
- */
-function processSvg(raw: string): string {
-  return raw
-    // Strip XML declaration — browsers don't allow it in data-URI SVGs
-    .replace(/<\?xml[^?]*\?>\s*/g, "")
-    // Replace hardcoded black strokes with currentColor so useSvgImage can theme them
-    .replace(/stroke="#000000"/gi, 'stroke="currentColor"')
-    .replace(/stroke="black"/gi, 'stroke="currentColor"')
-    .replace(/stroke="rgb\(0,\s*0,\s*0\)"/gi, 'stroke="currentColor"')
-    // The default stroke-width is 0.1% which renders invisibly thin at symbol size.
-    // Use 1.5% — visible across symbol sizes without being too thick.
-    .replace(/stroke-width="0\.1%"/g, 'stroke-width="1.5%"');
-}
-
 export async function dwgToSymbol(fileBuffer: ArrayBuffer, fileName: string): Promise<SymbolDefinition> {
   const rawSvg = await convertDwgToSvg(fileBuffer);
-  const svgContent = processSvg(rawSvg);
-  const viewBox = extractViewBox(svgContent);
   const name = fileName.replace(/\.[^.]+$/, "");
-
-  return {
-    id: uuidv4(),
-    name,
-    category: "Imported",
-    standard: "custom",
-    svgContent,
-    viewBox,
-    connectionPoints: [],
-    attributes: [
-      { name: "tag", label: "Tag", defaultValue: "", required: false },
-      { name: "description", label: "Description", defaultValue: "", required: false },
-    ],
-    tags: ["imported", "dwg"],
-  };
+  try {
+    const entities = flattenSvgToEntities(rawSvg);
+    return entitiesToSymbol(entities, name, ["imported", "dwg"]);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`DWG import failed: ${msg}`);
+  }
 }
 
 export function loadDwgFile(): Promise<{ buffer: ArrayBuffer; name: string }> {
