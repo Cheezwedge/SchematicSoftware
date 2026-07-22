@@ -41,6 +41,7 @@ const SymbolSchema = z.object({
   attributes: z.array(AttributeDefSchema),
   tags: z.array(z.string()),
   geometry: z.array(GeomElSchema).optional(),
+  defaultScale: z.number().positive().optional(),
 });
 
 const SchlibSchema = z.object({

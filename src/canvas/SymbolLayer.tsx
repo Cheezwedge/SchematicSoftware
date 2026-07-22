@@ -205,10 +205,12 @@ export function SymbolNode({ instance, isSelected, onSelect, showConnectionPoint
             key={cp.id}
             x={cp.x}
             y={cp.y}
-            radius={3}
+            // Divide by instance.scale so the guide dot stays a constant world size
+            // instead of ballooning into a blob when the symbol is scaled up.
+            radius={3 / instance.scale}
             fill="#00aa44"
             stroke="#007733"
-            strokeWidth={1}
+            strokeWidth={1 / instance.scale}
             listening={false}
           />
         ))}

@@ -165,6 +165,9 @@ export function entitiesToSymbol(entities: any[], name: string, tags: string[]):
     ],
     tags,
     geometry,
+    // Imported drawings are normalized into the standard symbol box, which makes
+    // detailed geometry feel small. Place them larger by default; the user can rescale.
+    defaultScale: 3,
   };
 }
 

@@ -41,6 +41,12 @@ export interface SymbolDefinition {
   tags: string[];
   /** Present on imported symbols; enables zoom-independent vector rendering. */
   geometry?: SymbolGeomEl[];
+  /**
+   * Default instance scale applied when this symbol is first placed (default 1).
+   * Imported symbols (DWG/DXF) set this larger so detailed drawings don't come in
+   * tiny — the user can still rescale afterwards.
+   */
+  defaultScale?: number;
 }
 
 export interface SymbolInstance {

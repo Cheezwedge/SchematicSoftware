@@ -812,12 +812,28 @@ html, body, #root {
   min-width: 0;
 }
 
+.prop-scale-input {
+  width: 52px;
+  flex-shrink: 0;
+  padding: 2px 4px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 11px;
+  font-family: monospace;
+  text-align: right;
+  outline: none;
+}
+
+.prop-scale-input:focus {
+  border-color: var(--accent);
+}
+
 .prop-scale-value {
   font-size: 10px;
   color: var(--text-muted);
   font-family: monospace;
-  width: 36px;
-  text-align: right;
   flex-shrink: 0;
 }
 

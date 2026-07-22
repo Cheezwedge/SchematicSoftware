@@ -206,6 +206,9 @@ export function AppShell() {
       if (!pendingPlacement || !activeSheetId) return;
       const layer = getActiveLayer(activeSheetId);
       const sheet = project.sheets.find((s) => s.id === activeSheetId);
+      const def = libraries
+        .flatMap((l) => l.symbols)
+        .find((s) => s.id === pendingPlacement.definitionId);
       const instance: SymbolInstance = {
         id: uuidv4(),
         type: "symbol",
@@ -215,13 +218,13 @@ export function AppShell() {
         x: pendingPlacement.pos.x,
         y: pendingPlacement.pos.y,
         rotation: pendingPlacement.rotation,
-        scale: 1,
+        scale: def?.defaultScale ?? 1,
         attributes,
       };
       addElement(activeSheetId, instance);
       setPendingPlacement(null);
     },
-    [pendingPlacement, activeSheetId, getActiveLayer, project, addElement, setPendingPlacement]
+    [pendingPlacement, activeSheetId, getActiveLayer, project, libraries, addElement, setPendingPlacement]
   );
 
   // Cross-sheet arrows

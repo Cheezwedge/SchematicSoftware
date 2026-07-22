@@ -136,12 +136,25 @@ function SymbolProperties({
           type="range"
           className="prop-slider"
           min={0.25}
-          max={4}
+          max={10}
           step={0.05}
-          value={instance.scale}
+          value={Math.min(instance.scale, 10)}
           onChange={(e) => onUpdate({ scale: Number(e.target.value) })}
         />
-        <span className="prop-scale-value">{Math.round(instance.scale * 100)}%</span>
+        <input
+          type="number"
+          className="prop-scale-input"
+          min={5}
+          max={5000}
+          step={5}
+          value={Math.round(instance.scale * 100)}
+          onChange={(e) => {
+            const pct = Number(e.target.value);
+            if (!Number.isFinite(pct)) return;
+            onUpdate({ scale: Math.min(50, Math.max(0.05, pct / 100)) });
+          }}
+        />
+        <span className="prop-scale-value">%</span>
       </PropRow>
       {attrDefs.map((attr) => (
         <PropRow key={attr.name} label={attr.label}>
